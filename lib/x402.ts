@@ -141,7 +141,9 @@ export type PayInit = { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: strin
 
 /** Read a 402's advertised price (USDC) without paying. */
 export async function quotePrice(url: string, init?: PayInit): Promise<number> {
-  const res = await fetch(url, { method: init?.method ?? "GET", body: init?.body });
+  // redirect: manual — a validated public host must not 302 us to an internal address (SSRF)
+  const res = await fetch(url, { method: init?.method ?? "GET", body: init?.body, redirect: "manual" });
+  if (res.status >= 300 && res.status < 400) throw new Error(`redirect not allowed from ${url}`);
   if (res.status !== 402) throw new Error(`expected 402 from ${url}, got ${res.status}`);
   const header = res.headers.get("payment-required");
   if (!header) throw new Error(`402 without PAYMENT-REQUIRED header from ${url}`);

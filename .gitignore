@@ -57,3 +57,6 @@ contracts/broadcast/
 
 # generated wallets / secrets
 wallets*.json
+
+# design reference (claude.ai/design export — implemented code lives in app/ and components/)
+design-system/

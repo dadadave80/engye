@@ -9,9 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
+      # SHA-pinned third-party actions (supply-chain: a moved tag can't inject code)
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       - run: bun install --frozen-lockfile
+      # secrets scoped to only this step, not checkout/setup
       - run: bun agents/demand.ts --cycles 1
         env:
           APP_URL: ${{ secrets.APP_URL }}

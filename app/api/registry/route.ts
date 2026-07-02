@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/db";
 import { quotePrice, payEndpoint, ensureGatewayFloat } from "@/lib/x402";
 import { validateDeliverable } from "@/lib/validator";
+import { assertPublicHttpsUrl } from "@/lib/ssrf";
 
 export const maxDuration = 60;
 
@@ -41,6 +42,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
   }
   const p = parsed.data;
+
+  // SSRF guard: reject before any server-side request to the submitted URL
+  try {
+    await assertPublicHttpsUrl(p.endpoint_url);
+  } catch (e) {
+    return NextResponse.json(
+      { error: "endpoint rejected", detail: e instanceof Error ? e.message : "invalid endpoint" },
+      { status: 422 },
+    );
+  }
 
   try {
     // 1) well-formed 402?
@@ -90,7 +101,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 201 },
     );
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: "probe failed", detail: message }, { status: 422 });
+    // don't echo upstream response bodies back to the caller — log server-side, return a generic reason
+    console.error("[registry] probe failed:", e instanceof Error ? e.message : String(e));
+    return NextResponse.json(
+      { error: "probe failed", detail: "endpoint did not complete a valid paid x402 probe" },
+      { status: 422 },
+    );
   }
 }
