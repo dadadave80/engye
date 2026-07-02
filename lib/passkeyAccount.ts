@@ -20,7 +20,7 @@ export interface SerializedKey { expiry: number; keyType: number; isSuperAdmin: 
 
 const ITHACA_IMPL = process.env.ITHACA_IMPL as Address;
 const USDC = (process.env.USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000") as Address;
-const DEMO_STAKE_SPONSOR = 1_000000n; // 1 USDC so a fresh passkey user can try staking (testnet demo)
+const DEMO_STAKE_SPONSOR = 250_000n; // 0.25 USDC so a fresh passkey user can try staking (testnet demo)
 
 function relayer() {
   const pk = process.env.BROKER_PRIVATE_KEY as Hex;
