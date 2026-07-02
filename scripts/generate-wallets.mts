@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const envPath = fileURLToPath(new URL("../.env.local", import.meta.url));
 const existing = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
 
-const roles = ["BROKER", "DEMAND", "PROVIDER1", "PROVIDER2", "PROVIDER3", "VALIDATOR"];
+const roles = ["BROKER", "DEMAND", "PROVIDER1", "PROVIDER2", "PROVIDER3", "VALIDATOR", "SESSION"];
 let out = "";
 for (const role of roles) {
   if (existing.includes(`${role}_ADDRESS=`)) {
