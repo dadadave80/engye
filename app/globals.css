@@ -1,26 +1,110 @@
 @import "tailwindcss";
 
+/* ENGYE fonts — Google Fonts (handover §2). Cinzel display, EB Garamond Greek, Geist UI, Geist Mono data. */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+
+/* ===== tokens/colors.css — two editorial modes, one token set ===== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --marble: #F2EDE0; --ink: #191511; --clay: #A0421F; --gold: #B7892C;
+  --laurel: #4F6B3A; --oxblood: #7E2318; --aegean: #26547C;
+  --clay-lifted: #C3562B; --gold-lifted: #CBA14A; --laurel-soft: #8FAE72;
+  --laurel-badge: #A9C48F; --oxblood-lifted: #B04A36; --oxblood-badge: #D98D7E; --aegean-lifted: #6E9CC4;
+
+  --background: #F2EDE0; --foreground: #191511;
+  --card: #F7F3E9; --card-foreground: #191511;
+  --popover: #F7F3E9; --popover-foreground: #191511;
+  --primary: #191511; --primary-foreground: #F2EDE0;
+  --secondary: #E7E0CF; --secondary-foreground: #191511;
+  --muted: #E9E3D3; --muted-foreground: #5C554B;
+  --accent: #A0421F; --accent-foreground: #F7F3E9;
+  --destructive: #7E2318; --destructive-foreground: #F7F3E9;
+  --success: #4F6B3A; --success-foreground: #F7F3E9;
+  --link: #26547C;
+  --border: color-mix(in oklab, #191511 14%, transparent);
+  --input: var(--border); --ring: #B7892C;
+  --chart-1: #A0421F; --chart-2: #4F6B3A; --chart-3: #B7892C; --chart-4: #26547C; --chart-5: #5C554B;
+
+  --radius: 0.375rem;
+  --shadow-popover: 0 2px 16px rgb(0 0 0 / 0.10);
+  --dur-fast: 120ms; --dur: 200ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --font-display: "Cinzel", serif;
+  --font-body: "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-greek: "EB Garamond", Georgia, serif;
+
+  --text-hero: clamp(3rem, 8vw, 7.5rem);
+  --text-section: clamp(2rem, 4vw, 3rem);
+  --text-subhead: 1.5rem;
+  --text-body: 1rem; --text-table: 0.875rem; --text-caption: 0.8125rem;
+  --tracking-display: 0.06em; --tracking-eyebrow: 0.25em;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px; --space-28: 112px;
+}
+
+.dark {
+  --background: #191511; --foreground: #EDE7D8;
+  --card: #211C16; --card-foreground: #EDE7D8;
+  --popover: #211C16; --popover-foreground: #EDE7D8;
+  --primary: #EDE7D8; --primary-foreground: #191511;
+  --secondary: #2A241D; --secondary-foreground: #EDE7D8;
+  --muted: #2A241D; --muted-foreground: #A79D8C;
+  --accent: #C3562B; --accent-foreground: #191511;
+  --destructive: #B04A36; --destructive-foreground: #191511;
+  --success: #8FAE72; --success-foreground: #191511;
+  --link: #6E9CC4;
+  --border: color-mix(in oklab, #EDE7D8 14%, transparent);
+  --input: var(--border); --ring: #CBA14A;
+  --chart-1: #C3562B; --chart-2: #8FAE72; --chart-3: #CBA14A; --chart-4: #6E9CC4; --chart-5: #A79D8C;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
 body {
+  font-family: var(--font-body);
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ===== typography utilities ===== */
+.text-hero { font-family: var(--font-display); font-weight: 700; font-size: var(--text-hero); letter-spacing: var(--tracking-display); line-height: 1.05; }
+.text-section { font-family: var(--font-display); font-weight: 600; font-size: var(--text-section); letter-spacing: var(--tracking-display); line-height: 1.15; }
+.text-subhead { font-family: var(--font-body); font-weight: 500; font-size: var(--text-subhead); line-height: 1.35; }
+.text-greek { font-family: var(--font-greek); font-style: italic; }
+.text-data { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 12px;
+  font-family: var(--font-display); font-weight: 700; font-size: 12px;
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--gold);
+}
+.dark .eyebrow { color: var(--gold-lifted); }
+.eyebrow::before { content: ""; width: 24px; height: 1px; background: currentColor; }
+
+/* ===== layout: stele, fluting, meander ===== */
+.stele { border-top: 1px solid currentColor; position: relative; }
+.stele::before { content: ""; position: absolute; top: 3px; left: 0; right: 0; border-top: 1px solid currentColor; }
+.fluting { background-image: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 24px); opacity: 0.05; }
+.meander-hairline { height: 8px; opacity: 0.2; background-image: url("/assets/meander-tile.svg"); background-repeat: repeat-x; background-size: auto 8px; }
+.dark .meander-hairline, .meander-hairline.light { background-image: url("/assets/meander-tile-light.svg"); }
+
+/* the only pulse in the product — the live pill's laurel dot */
+@keyframes engye-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+/* single slide-fade per new feed row */
+@keyframes engye-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.engye-row-in { animation: engye-row-in var(--dur) var(--ease); }
+@media (prefers-reduced-motion: reduce) { .engye-row-in, [style*="engye-live-pulse"] { animation: none !important; } }
+
+a { color: inherit; }
