@@ -6,6 +6,7 @@ import { supabaseAdmin } from "@/lib/db";
 import { quotePrice, payEndpoint, ensureGatewayFloat } from "@/lib/x402";
 import { validateDeliverable } from "@/lib/validator";
 import { assertPublicHttpsUrl } from "@/lib/ssrf";
+import { limited } from "@/lib/ratelimit";
 
 export const maxDuration = 60;
 
@@ -37,6 +38,9 @@ export async function GET(): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!supabaseAdmin) return NextResponse.json({ error: "persistence unavailable" }, { status: 503 });
+  // strict: each probe spends real treasury USDC paying the endpoint — 5/hour/IP
+  const rl = limited(req, "registry", 5, 3_600_000);
+  if (rl) return rl;
   const parsed = registerSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });

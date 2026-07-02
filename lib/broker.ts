@@ -4,6 +4,7 @@ import { z } from "zod";
 import { decide } from "./llm";
 import { supabaseAdmin } from "./db";
 import { brokerContext, type ProviderRow } from "./reputation";
+import { usdcBalance } from "./escrow";
 import {
   feeFor,
   bondFor,
@@ -38,6 +39,8 @@ Rules:
 - provider_id is the provider's P-number from the registry table (e.g. "P2").
 Reply with strict JSON: {action, provider_id, confidence, reasoning, decline_reason}.`;
 
+const MIN_TREASURY_USDC = 1.0; // circuit breaker: pause matching below this (plan §11)
+
 export async function quoteTask(task: Task, requesterWallet: string | null) {
   const { providers, table } = await brokerContext();
   if (providers.length === 0) {
@@ -46,6 +49,19 @@ export async function quoteTask(task: Task, requesterWallet: string | null) {
       declineReason: "no active providers registered",
       reasoning: "registry empty",
     });
+  }
+  // circuit breaker — never quote a bond the treasury can't cover
+  try {
+    const bal = await usdcBalance(process.env.BROKER_ADDRESS as `0x${string}`);
+    if (bal < MIN_TREASURY_USDC) {
+      return persistQuote(task, requesterWallet, null, null, {
+        action: "decline" as const,
+        declineReason: `circuit breaker: treasury ${bal.toFixed(3)} USDC below floor ${MIN_TREASURY_USDC}`,
+        reasoning: "matching paused — treasury below safety floor",
+      });
+    }
+  } catch {
+    // if the balance read fails, fall through — the EV gate + bond cap still bound exposure
   }
 
   const user = `Task: ${JSON.stringify(task)}

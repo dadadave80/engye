@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { quoteTask } from "@/lib/broker";
+import { limited } from "@/lib/ratelimit";
 
 const bodySchema = z.object({
   task: z.object({
@@ -14,6 +15,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const rl = limited(req, "quote", 20, 60_000); // LLM cost — 20/min/IP
+  if (rl) return rl;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });

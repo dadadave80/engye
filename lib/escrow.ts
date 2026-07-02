@@ -216,3 +216,16 @@ export async function getBond(matchId: Hex) {
 }
 
 export const arcscanTx = (hash: string): string => `https://testnet.arcscan.app/tx/${hash}`;
+
+/** ERC-20 (6-dec) USDC balance of any address, as a float. */
+export async function usdcBalance(addr: Address): Promise<number> {
+  const { pub } = clients();
+  const raw = await pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [addr] });
+  return Number(raw) / 1e6;
+}
+
+/** Native (gas) balance in USDC (18-dec view). */
+export async function gasBalance(addr: Address): Promise<number> {
+  const { pub } = clients();
+  return Number(await pub.getBalance({ address: addr })) / 1e18;
+}
