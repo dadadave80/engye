@@ -112,18 +112,94 @@ export const slashBond = (matchId: Hex): Promise<Hex> => write("slash", [matchId
 /** Permissionless rescue after deadline — pays the requester even if the resolver is dead. */
 export const claimTimeout = (matchId: Hex): Promise<Hex> => write("claim_timeout", [matchId]);
 
-/** Treasury price refund to the requester (rail B, plain USDC transfer). */
-export async function refundFromTreasury(to: Address, amountUsdc: number): Promise<Hex> {
+const vaultAbi = parseAbi([
+  "function fund(uint256 amount)",
+  "function refund(bytes32 matchId, address to, uint256 amount)",
+  "function refunded(bytes32 matchId) view returns (uint256)",
+]);
+
+const stakeAbi = parseAbi([
+  "function stakes(address provider) view returns (uint256)",
+  "function slash_stake(bytes32 matchId, address provider, address requester, uint256 amount) returns (uint256)",
+]);
+
+function vaultAddress(): Address {
+  const a = process.env.REFUND_VAULT_ADDRESS;
+  if (!a) throw new Error("REFUND_VAULT_ADDRESS not set — deploy contracts first (Phase 2)");
+  return a as Address;
+}
+
+function stakeAddress(): Address {
+  const a = process.env.PROVIDER_STAKE_ADDRESS;
+  if (!a) throw new Error("PROVIDER_STAKE_ADDRESS not set — deploy contracts first (Phase 2)");
+  return a as Address;
+}
+
+/** Price refund to the requester via RefundVault — once-per-match enforced on-chain. */
+export async function refundFromTreasury(matchId: Hex, to: Address, amountUsdc: number): Promise<Hex> {
   const { pub, wallet, account } = clients();
   const hash = await wallet.writeContract({
-    address: USDC,
-    abi: erc20Abi,
-    functionName: "transfer",
-    args: [to, usdcAtomic(amountUsdc)],
+    address: vaultAddress(),
+    abi: vaultAbi,
+    functionName: "refund",
+    args: [matchId, to, usdcAtomic(amountUsdc)],
     account,
   });
   const receipt = await pub.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`refund reverted: ${hash}`);
+  return hash;
+}
+
+/** Move broker USDC into the refund float (needs ensureAllowance for the vault). */
+export async function fundVault(amountUsdc: number): Promise<Hex> {
+  const { pub, wallet, account } = clients();
+  const approve = await wallet.writeContract({
+    address: USDC,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [vaultAddress(), usdcAtomic(amountUsdc)],
+    account,
+  });
+  await pub.waitForTransactionReceipt({ hash: approve });
+  const hash = await wallet.writeContract({
+    address: vaultAddress(),
+    abi: vaultAbi,
+    functionName: "fund",
+    args: [usdcAtomic(amountUsdc)],
+    account,
+  });
+  await pub.waitForTransactionReceipt({ hash });
+  return hash;
+}
+
+/** Provider co-insurance stake (0 if unstaked) — the broker LLM reads this as a trust signal. */
+export async function getProviderStake(provider: Address): Promise<bigint> {
+  const { pub } = clients();
+  return pub.readContract({
+    address: stakeAddress(),
+    abi: stakeAbi,
+    functionName: "stakes",
+    args: [provider],
+  });
+}
+
+/** On fail: slash provider stake (capped at stake, once per match) to the requester, on top of the bond. */
+export async function slashProviderStake(
+  matchId: Hex,
+  provider: Address,
+  requester: Address,
+  amountUsdc: number,
+): Promise<Hex> {
+  const { pub, wallet, account } = clients();
+  const hash = await wallet.writeContract({
+    address: stakeAddress(),
+    abi: stakeAbi,
+    functionName: "slash_stake",
+    args: [matchId, provider, requester, usdcAtomic(amountUsdc)],
+    account,
+  });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`slash_stake reverted: ${hash}`);
   return hash;
 }
 
