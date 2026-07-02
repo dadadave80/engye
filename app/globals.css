@@ -1,7 +1,8 @@
-@import "tailwindcss";
-
-/* ENGYE fonts — Google Fonts (handover §2). Cinzel display, EB Garamond Greek, Geist UI, Geist Mono data. */
+/* @import rules must precede everything else in the GENERATED css — Tailwind v4 inlines
+   `@import "tailwindcss"` into real rules, so this Google Fonts @import must come FIRST or
+   Turbopack's dev CSS parser rejects it ("@import must precede all rules"). */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
 
 /* ===== tokens/colors.css — two editorial modes, one token set ===== */
 :root {
