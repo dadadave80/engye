@@ -48,6 +48,7 @@ export const ithacaAbi = parseAbi([
   "function computeDigest((address to,uint256 value,bytes data)[] calls, uint256 nonce) view returns (bytes32)",
   "function getNonce(uint192 seqKey) view returns (uint256)",
   "function authorize((uint40 expiry,uint8 keyType,bool isSuperAdmin,bytes publicKey) key) returns (bytes32)",
+  "function revoke(bytes32 keyHash)",
 ]);
 
 export const CALLS_PARAM = {
