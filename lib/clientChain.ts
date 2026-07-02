@@ -45,6 +45,6 @@ export const gatewayWalletAbi = [
 
 // resilient transport: the public Arc RPC is flaky; viem's default 10s/thin-retry surfaced
 // transient reads as "HTTP request failed" in the UI. Give browser reads room + retries.
-export const publicClient = createPublicClient({ chain: arcTestnet, transport: http(RPC_URL, { timeout: 20_000, retryCount: 3, retryDelay: 500 }) });
+export const publicClient = createPublicClient({ chain: arcTestnet, transport: http(RPC_URL, { timeout: 15_000, retryCount: 3, retryDelay: 200 }), pollingInterval: 1000 });
 export const usdcAtomic = (usdc: number) => BigInt(Math.round(usdc * 1e6));
 export const fromAtomic = (v: bigint) => Number(v) / 1e6;

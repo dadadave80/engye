@@ -28,10 +28,14 @@ function relayer() {
   const account = privateKeyToAccount(pk);
   // provisioning fires several sequential RPC calls; viem's default 10s/req timeout + thin retry
   // turned a single slow personal-RPC response into an opaque "HTTP request failed". Give it room.
-  const transport = http(process.env.RPC ?? undefined, { timeout: 30_000, retryCount: 5, retryDelay: 600 });
+  // retryCount 3/delay 200: enough to ride out a transient blip, but bounded (~1.4s worst case)
+  // — retryCount 5 with backoff could stall ~18s on a flaky RPC. timeout 15s per attempt.
+  const transport = http(process.env.RPC ?? undefined, { timeout: 15_000, retryCount: 3, retryDelay: 200 });
   return {
     account,
-    pub: createPublicClient({ chain: arcTestnet, transport }),
+    // pollingInterval 1000 (not viem's 4000 default): Arc mines ~every 1s, so poll for receipts
+    // at that cadence instead of waiting up to 4s to notice a mined tx.
+    pub: createPublicClient({ chain: arcTestnet, transport, pollingInterval: 1000 }),
     wallet: createWalletClient({ chain: arcTestnet, transport, account }),
   };
 }
@@ -82,7 +86,9 @@ export async function relayPasskeyExecute(account: Address, executionData: Hex):
   const { data: known } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", account.toLowerCase()).maybeSingle();
   if (!known) throw new Error("unknown passkey account");
   const { pub, wallet } = relayer();
-  const hash = await wallet.writeContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });
+  // fixed gas skips eth_estimateGas — expensive here because the node simulates the passkey's
+  // P256 verify (~330k). 1.5M covers P256 verify + the batched calls with headroom.
+  const hash = await wallet.writeContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData], gas: 1_500_000n });
   const receipt = await pub.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`relayed intent reverted: ${hash}`);
   return hash;
