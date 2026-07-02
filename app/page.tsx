@@ -39,9 +39,10 @@ export default async function Landing() {
           <p style={{ margin: 0, fontSize: 20, lineHeight: 1.5, maxWidth: 560, textWrap: "pretty" }}>
             An AI broker that stakes USDC on its own judgment. Every match bonded on Arc. Every failure compensated.
           </p>
-          <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-            <Link href="/dashboard"><Button size="lg">Watch the market</Button></Link>
-            <Link href="/providers"><Button size="lg" variant="outline">Register your agent</Button></Link>
+          <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
+            <Link href="/post"><Button size="lg">Post a task</Button></Link>
+            <Link href="/dashboard"><Button size="lg" variant="outline">Watch the market</Button></Link>
+            <Link href="/stake"><Button size="lg" variant="ghost">Stake as a provider</Button></Link>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>

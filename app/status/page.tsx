@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/AppShell";
 import { Card, Eyebrow, AddressChip, StatCard } from "@/components/ui/primitives";
+import { ClaimCard } from "@/components/ClaimCard";
 import { usdcBalance, gasBalance } from "@/lib/escrow";
 import { getTotals } from "@/lib/queries";
 import { Check } from "lucide-react";
@@ -61,6 +62,8 @@ export default async function StatusPage() {
             </div>
           ))}
         </Card>
+
+        <ClaimCard />
       </div>
     </AppShell>
   );
