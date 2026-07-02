@@ -1,26 +1,45 @@
 "use client";
-// Passkey session — built on Porto's Key module (porto/viem/Key) over the ithacaxyz/account
-// contract we deployed on Arc. The passkey is a WebAuthn-P256 super-admin on a per-user
-// EIP-7702 Ithaca account; ENGYE self-relays intents (Porto's hosted relay doesn't serve Arc).
-import { createContext, useContext, useState, type ReactNode } from "react";
+// Passkey account store — supports MULTIPLE accounts (for the Switch / Sign up modal UX),
+// built on Porto's Key module over our IthacaAccount on Arc. Persisted in localStorage.
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { Address, Hex } from "viem";
 
 export interface PasskeySession {
   address: Address; // the user's Ithaca smart-account (EOA) address
-  credentialId: string; // WebAuthn credential id (base64url, from Porto/ox)
+  credentialId: string; // WebAuthn credential id
   credentialPublicKey: Hex; // ox PublicKey hex — reconstructs the key for signing
+  label?: string; // optional friendly name
 }
 
-interface PasskeyCtx {
-  session: PasskeySession | null;
-  setSession: (s: PasskeySession | null) => void;
-}
+const STORE = "engye.passkey.v2";
+interface Store { accounts: PasskeySession[]; current: string | null }
+const read = (): Store => {
+  try { return JSON.parse(localStorage.getItem(STORE) || "") || { accounts: [], current: null }; }
+  catch { return { accounts: [], current: null }; }
+};
 
-const Ctx = createContext<PasskeyCtx>({ session: null, setSession: () => {} });
+interface Ctx {
+  accounts: PasskeySession[];
+  current: PasskeySession | null;
+  addAccount: (s: PasskeySession) => void;
+  switchTo: (address: string) => void;
+  signOut: () => void;
+}
+const C = createContext<Ctx>({ accounts: [], current: null, addAccount: () => {}, switchTo: () => {}, signOut: () => {} });
 
 export function PasskeyProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<PasskeySession | null>(null);
-  return <Ctx.Provider value={{ session, setSession }}>{children}</Ctx.Provider>;
+  const [store, setStore] = useState<Store>({ accounts: [], current: null });
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage on mount (unavailable during SSR/render)
+  useEffect(() => setStore(read()), []);
+  const persist = useCallback((s: Store) => { localStorage.setItem(STORE, JSON.stringify(s)); setStore(s); }, []);
+
+  const addAccount = (s: PasskeySession) =>
+    persist({ accounts: [...store.accounts.filter((a) => a.address !== s.address), s], current: s.address });
+  const switchTo = (address: string) => persist({ ...store, current: address });
+  const signOut = () => persist({ ...store, current: null });
+
+  const current = store.accounts.find((a) => a.address === store.current) ?? null;
+  return <C.Provider value={{ accounts: store.accounts, current, addAccount, switchTo, signOut }}>{children}</C.Provider>;
 }
 
-export const usePasskey = () => useContext(Ctx);
+export const usePasskey = () => useContext(C);

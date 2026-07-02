@@ -13,13 +13,13 @@ import type { Call } from "@/lib/ithaca";
 export function useAccountActions() {
   const wallet = useWallet();
   const { data: walletClient } = useWalletClient();
-  const { session } = usePasskey();
+  const { current } = usePasskey();
 
   /** Execute a batch of calls; returns the final tx hash. */
   async function send(calls: Call[]): Promise<Hex> {
     if (calls.length === 0) throw new Error("no calls");
-    if (wallet.kind === "passkey" && session) {
-      return signAndRelay(session, calls); // one batched, passkey-signed, ENGYE-relayed execute
+    if (wallet.kind === "passkey" && current) {
+      return signAndRelay(current, calls); // one batched, passkey-signed, ENGYE-relayed execute
     }
     if (wallet.kind === "eoa" && walletClient) {
       let last: Hex | undefined;

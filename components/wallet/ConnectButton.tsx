@@ -1,14 +1,11 @@
 "use client";
-// The Connect affordance (top-right of the app shell). Opens a small menu:
-//  - Browser wallet (EOA) via wagmi injected connector — full flow incl. x402 pay
-//  - Passkey (Ithaca smart account) — rail-B actions, no extension
-// Connected → shows a truncated address + kind chip; click to disconnect / view account.
+// The Connect affordance (top-right of the app shell). Opens the Porto-style ConnectModal
+// (Continue / Switch / Sign up + browser wallet). Connected → address chip with a small menu.
 import { useState } from "react";
-import { useConnect, useDisconnect } from "wagmi";
-import { injected } from "wagmi/connectors";
+import { useDisconnect } from "wagmi";
 import { useWallet } from "./useWallet";
 import { usePasskey } from "./passkey";
-import { connectPasskey } from "./passkeyClient";
+import { ConnectModal } from "./ConnectModal";
 
 const chip: React.CSSProperties = {
   fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 12,
@@ -25,50 +22,40 @@ const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export function ConnectButton() {
   const wallet = useWallet();
-  const { connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const { setSession } = usePasskey();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
+  const { accounts, signOut } = usePasskey();
+  const [modal, setModal] = useState(false);
+  const [menu, setMenu] = useState(false);
 
   if (wallet.connected && wallet.address) {
     return (
       <div style={{ position: "relative" }}>
-        <button style={chip} onClick={() => setOpen((o) => !o)}>
+        <button style={chip} onClick={() => setMenu((o) => !o)}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--success)" }} />
           {trunc(wallet.address)}
-          <span style={{ color: "var(--muted-foreground)" }}>· {wallet.kind}</span>
+          <span style={{ color: "var(--muted-foreground)" }}>· {wallet.kind === "passkey" ? "passkey" : "wallet"}</span>
         </button>
-        {open && (
-          <div style={{ position: "absolute", right: 0, top: 40, minWidth: 180, background: "var(--popover)", border: "1px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-popover)", zIndex: 20 }}>
-            <button style={item} onClick={() => { navigator.clipboard?.writeText(wallet.address!); setOpen(false); }}>Copy address</button>
-            <button style={{ ...item, color: "var(--destructive)" }} onClick={() => { disconnect(); setSession(null); setOpen(false); }}>Disconnect</button>
+        {menu && (
+          <div style={{ position: "absolute", right: 0, top: 40, minWidth: 190, background: "var(--popover)", border: "1px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-popover)", zIndex: 20 }}>
+            <button style={item} onClick={() => { navigator.clipboard?.writeText(wallet.address!); setMenu(false); }}>Copy address</button>
+            {wallet.kind === "passkey" && accounts.length > 1 && (
+              <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Switch account</button>
+            )}
+            <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Add / sign up</button>
+            <button style={{ ...item, color: "var(--destructive)" }} onClick={() => { wallet.kind === "eoa" ? disconnect() : signOut(); setMenu(false); }}>Disconnect</button>
           </div>
         )}
+        {modal && <ConnectModal onClose={() => setModal(false)} />}
       </div>
     );
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      <button style={{ ...chip, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "var(--primary)" }} onClick={() => setOpen((o) => !o)}>
+    <>
+      <button style={{ ...chip, background: "var(--primary)", color: "var(--primary-foreground)", borderColor: "var(--primary)" }} onClick={() => setModal(true)}>
         Connect
       </button>
-      {open && (
-        <div style={{ position: "absolute", right: 0, top: 40, minWidth: 220, background: "var(--popover)", border: "1px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-popover)", zIndex: 20 }}>
-          <button style={item} disabled={busy !== null} onClick={() => { setOpen(false); connect({ connector: injected() }); }}>
-            Browser wallet <span style={{ color: "var(--muted-foreground)" }}>· full flow</span>
-          </button>
-          <button style={item} disabled={busy !== null} onClick={async () => {
-            setBusy("passkey");
-            try { const s = await connectPasskey(); if (s) setSession(s); setOpen(false); }
-            catch (e) { console.error("passkey connect:", e); }
-            finally { setBusy(null); }
-          }}>
-            {busy === "passkey" ? "Waiting for passkey…" : <>Passkey <span style={{ color: "var(--muted-foreground)" }}>· Porto · no extension</span></>}
-          </button>
-        </div>
-      )}
-    </div>
+      {modal && <ConnectModal onClose={() => setModal(false)} />}
+    </>
   );
 }

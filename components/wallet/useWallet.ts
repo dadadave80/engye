@@ -17,13 +17,13 @@ export interface WalletView {
 
 export function useWallet(): WalletView {
   const { address: eoa, isConnected } = useAccount();
-  const { session } = usePasskey();
+  const { current } = usePasskey();
 
   if (isConnected && eoa) {
     return { address: eoa, kind: "eoa", connected: true, canPayGateway: true };
   }
-  if (session) {
-    return { address: session.address, kind: "passkey", connected: true, canPayGateway: false };
+  if (current) {
+    return { address: current.address, kind: "passkey", connected: true, canPayGateway: false };
   }
   return { address: null, kind: null, connected: false, canPayGateway: false };
 }
