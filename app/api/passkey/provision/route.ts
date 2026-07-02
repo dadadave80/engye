@@ -25,8 +25,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const account = await provisionPasskeyAccount({ ...parsed.data.key, publicKey: parsed.data.key.publicKey as `0x${string}` }, parsed.data.credentialId);
     return NextResponse.json({ account });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.error("[passkey/provision]", message);
+    const raw = e instanceof Error ? e.message : String(e);
+    console.error("[passkey/provision]", raw);
+    // transport hiccups (viem HttpRequestError / timeouts) are transient — tell the user to retry
+    const transient = /HTTP request failed|timed out|took too long|fetch failed|ECONN|socket/i.test(raw);
+    const message = transient ? "Couldn't reach Arc just now — please try again in a moment." : raw;
     return NextResponse.json({ error: "provision failed", message }, { status: 500 });
   }
 }

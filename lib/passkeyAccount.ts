@@ -26,7 +26,9 @@ function relayer() {
   const pk = process.env.BROKER_PRIVATE_KEY as Hex;
   if (!pk) throw new Error("BROKER_PRIVATE_KEY (relayer) missing");
   const account = privateKeyToAccount(pk);
-  const transport = http(process.env.RPC ?? undefined);
+  // provisioning fires several sequential RPC calls; viem's default 10s/req timeout + thin retry
+  // turned a single slow personal-RPC response into an opaque "HTTP request failed". Give it room.
+  const transport = http(process.env.RPC ?? undefined, { timeout: 30_000, retryCount: 5, retryDelay: 600 });
   return {
     account,
     pub: createPublicClient({ chain: arcTestnet, transport }),

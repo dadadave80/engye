@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { useConnect } from "wagmi";
 import { injected } from "wagmi/connectors";
-import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight } from "lucide-react";
+import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } from "lucide-react";
 import { usePasskey } from "./passkey";
 import { signUpPasskey } from "./passkeyClient";
 
@@ -95,13 +95,17 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
 
-            {/* browser wallet (EOA) — needed to sign Circle Gateway x402 payments */}
+            {/* browser wallet (EOA) — a full first-class option: fund it and pay/stake directly */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <button onClick={() => { connect({ connector: injected() }); onClose(); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser wallet</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>needed for payments <ChevronRight size={14} /></span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>MetaMask · injected <ChevronRight size={14} /></span>
               </button>
+              <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none", lineHeight: 1.4 }}>
+                New to Arc? Fund your wallet with testnet USDC — <span style={{ color: "var(--link)" }}>Circle Faucet</span> <ExternalLink size={11} /> <span>(pick Arc Testnet)</span>
+              </a>
             </div>
 
             {err && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)" }}>{err}</div>}

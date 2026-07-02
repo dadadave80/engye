@@ -87,6 +87,11 @@ export function StakePanel() {
         {wallet.kind === "passkey" && <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Passkey account · ENGYE relays gas · signed with your device</div>}
         <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Your stake</span><span>{fromAtomic(staked).toFixed(4)} USDC</span></div>
         <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Account USDC</span><span>{fromAtomic(usdcBal).toFixed(4)} USDC</span></div>
+        {usdcBal === 0n && (
+          <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none" }}>
+            No USDC yet? Get testnet USDC from the <span style={{ color: "var(--link)" }}>Circle Faucet ↗</span> — pick Arc Testnet, paste your address.
+          </a>
+        )}
         {pending.amount > 0n && (
           <div style={{ ...row, color: "var(--gold-lifted)" }}><span>Unstaking</span><span>{fromAtomic(pending.amount).toFixed(4)} · {canWithdraw ? "ready" : `${Math.ceil(cooldownLeft / 60)}m cooldown`}</span></div>
         )}
