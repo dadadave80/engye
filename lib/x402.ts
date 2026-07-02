@@ -10,7 +10,10 @@ const USDC = process.env.USDC_ADDRESS ?? "0x360000000000000000000000000000000000
 const GATEWAY_WALLET =
   process.env.GATEWAY_WALLET_ADDRESS ?? "0x0077777d7EBA4688BDeF3E311b846F25870A19B9";
 
-const facilitator = new BatchFacilitatorClient();
+// SDK v3 defaults to the PRODUCTION facilitator — Arc testnet needs the testnet URL explicitly
+const facilitator = new BatchFacilitatorClient({
+  url: process.env.FACILITATOR_URL ?? "https://gateway-api-testnet.circle.com",
+});
 
 export type PaymentDirection = "inbound" | "outbound";
 

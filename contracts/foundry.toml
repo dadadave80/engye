@@ -7,5 +7,8 @@ libs = ["lib"]
 evm_version = "cancun"
 
 # pinned toolchain: vyper 0.4.3+commit.bff19ea2
+# gas-optimized + Venom IR backend (user directive 2026-07-02)
 [vyper]
 path = "/Users/dadadave/.local/bin/vyper"
+optimize = "gas"
+experimental_codegen = true

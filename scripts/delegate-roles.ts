@@ -47,9 +47,12 @@ for (const r of ROLES) {
   const roleAccount = privateKeyToAccount(process.env[r.pkVar] as `0x${string}`);
   const role = roleAccount.address;
 
-  // 1) delegate + initialize atomically (same type-4 tx closes the initialize race)
-  const code = await pub.getCode({ address: role }).catch(() => undefined);
-  if (!code || code === "0x") {
+  // 1) delegate + initialize atomically (same type-4 tx closes the initialize race).
+  //    Re-delegates if the designator points at an older delegate version (storage survives).
+  const expected = `0xef0100${DELEGATE.slice(2)}`.toLowerCase();
+  const code = ((await pub.getCode({ address: role }).catch(() => undefined)) ?? "0x").toLowerCase();
+  if (code !== expected) {
+    const fresh = code === "0x"; // never delegated → also initialize(manager=ROOT)
     const nonce = await pub.getTransactionCount({ address: role });
     const auth = await roleAccount.signAuthorization({
       contractAddress: DELEGATE,
@@ -58,14 +61,16 @@ for (const r of ROLES) {
     });
     const hash = await sessionWallet.sendTransaction({
       to: role,
-      data: encodeFunctionData({ abi: accountAbi, functionName: "initialize", args: [ROOT] }),
+      data: fresh
+        ? encodeFunctionData({ abi: accountAbi, functionName: "initialize", args: [ROOT] })
+        : undefined,
       authorizationList: [auth],
     });
     await pub.waitForTransactionReceipt({ hash });
-    console.log(`${r.name} delegated + initialized(manager=root): ${hash}`);
+    console.log(`${r.name} ${fresh ? "delegated + initialized(manager=root)" : "re-delegated to current version"}: ${hash}`);
   } else {
     const mgr = await pub.readContract({ address: role, abi: accountAbi, functionName: "manager", args: [] });
-    console.log(`${r.name} already delegated (manager ${mgr})`);
+    console.log(`${r.name} already on current delegate (manager ${mgr})`);
   }
 
   // 2) session registers itself on the role account through the root hop

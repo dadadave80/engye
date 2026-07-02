@@ -5,6 +5,24 @@ import {Test} from "forge-std/Test.sol";
 import {ISessionAccount} from "../interfaces/ISessionAccount.sol";
 import {MockUSDC} from "./BondedEscrow.t.sol";
 
+contract MockERC721 {
+    mapping(uint256 => address) public ownerOf;
+
+    function safeMint(address to, uint256 id) external {
+        ownerOf[id] = to;
+        if (to.code.length > 0) {
+            (bool ok, bytes memory ret) = to.call(
+                abi.encodeWithSignature(
+                    "onERC721Received(address,address,uint256,bytes)", msg.sender, address(0), id, ""
+                )
+            );
+            require(
+                ok && ret.length >= 32 && bytes4(ret) == bytes4(0x150b7a02), "unsafe recipient"
+            );
+        }
+    }
+}
+
 /// Exercises the delegate through a REAL EIP-7702 delegation (vm.signAndAttachDelegation),
 /// so code runs in the EOA's storage context exactly as on Arc.
 contract SessionAccountTest is Test {
@@ -101,6 +119,13 @@ contract SessionAccountTest is Test {
         ISessionAccount(role).initialize(root);
         vm.expectRevert(bytes("initialized"));
         ISessionAccount(role).initialize(intruder);
+    }
+
+    function test_safeMint_to_delegated_account() public {
+        // regression: ERC-8004 IdentityRegistry safe-mints agent NFTs to msg.sender
+        MockERC721 nft = new MockERC721();
+        nft.safeMint(role, 1); // reverts unless the delegate answers onERC721Received
+        assertEq(nft.ownerOf(1), role);
     }
 
     function test_execute_batch_and_value_forwarding() public {

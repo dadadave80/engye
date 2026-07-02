@@ -30,6 +30,9 @@ const { price, result } = await payEndpoint(
   { method: "POST", body: JSON.stringify({ type: "spike", spec: "prove the rail" }) },
 );
 
-console.log(`paid ${price} USDC — response:`, JSON.stringify(result, null, 2));
+console.log(
+  `paid ${price} USDC — response:`,
+  JSON.stringify(result, (_, v) => (typeof v === "bigint" ? v.toString() : v), 2),
+);
 const after = await gateway.getBalances();
 console.log("gateway after:", after.gateway.formattedAvailable, "USDC");

@@ -80,6 +80,25 @@ def execute_batch(calls: DynArray[Call, 10]):
         log Executed(by=msg.sender, target=c.target, value=c.value)
         raw_call(c.target, c.data, value=c.value)
 
+# --- token receiver callbacks (v2) ---
+# ERC-8004's IdentityRegistry safe-mints agent NFTs; a 7702-delegated EOA IS a
+# contract, so without these callbacks safeMint (and any safeTransfer) reverts.
+
+@pure
+@external
+def onERC721Received(operator: address, from_addr: address, token_id: uint256, data: Bytes[1024]) -> bytes4:
+    return method_id("onERC721Received(address,address,uint256,bytes)", output_type=bytes4)
+
+@pure
+@external
+def onERC1155Received(operator: address, from_addr: address, id: uint256, amount: uint256, data: Bytes[1024]) -> bytes4:
+    return method_id("onERC1155Received(address,address,uint256,uint256,bytes)", output_type=bytes4)
+
+@pure
+@external
+def onERC1155BatchReceived(operator: address, from_addr: address, ids: DynArray[uint256, 32], amounts: DynArray[uint256, 32], data: Bytes[1024]) -> bytes4:
+    return method_id("onERC1155BatchReceived(address,address,uint256[],uint256[],bytes)", output_type=bytes4)
+
 @payable
 @external
 def __default__():
