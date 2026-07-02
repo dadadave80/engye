@@ -1,0 +1,11 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+# Arc targets Prague (docs.arc.network/arc/references/evm-compatibility);
+# cancun is the safe compile target — EIP-4844 blobs are disabled on Arc anyway.
+evm_version = "cancun"
+
+# pinned toolchain: vyper 0.4.3+commit.bff19ea2
+[vyper]
+path = "/Users/dadadave/.local/bin/vyper"
