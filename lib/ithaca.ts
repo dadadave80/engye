@@ -84,7 +84,8 @@ export const passkeyKeyFor = (x: string, y: string): IthacaKey => ({
 
 /** Read the current nonce + ERC-7821 digest for a call batch on any Ithaca account. */
 export async function accountDigest(account: Address, calls: Call[]): Promise<{ digest: Hex; nonce: bigint }> {
-  const transport = http(process.env.NEXT_PUBLIC_RPC_URL || process.env.RPC || undefined);
+  // server (scripts/API): personal RPC; browser: the public NEXT_PUBLIC RPC
+  const transport = http(process.env.RPC || process.env.NEXT_PUBLIC_RPC_URL || undefined);
   const pub = createPublicClient({ chain: arcTestnet, transport });
   const nonce = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
   const digest = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });

@@ -65,7 +65,7 @@ export function ConnectButton() {
             catch (e) { console.error("passkey connect:", e); }
             finally { setBusy(null); }
           }}>
-            {busy === "passkey" ? "Waiting for passkey…" : <>Passkey <span style={{ color: "var(--muted-foreground)" }}>· no extension</span></>}
+            {busy === "passkey" ? "Waiting for passkey…" : <>Passkey <span style={{ color: "var(--muted-foreground)" }}>· Porto · no extension</span></>}
           </button>
         </div>
       )}

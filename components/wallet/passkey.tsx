@@ -1,20 +1,14 @@
 "use client";
-// Passkey → IthacaAccount smart-wallet connect (the innovation layer).
-// A WebAuthn P-256 credential is authorized as a signer on an Ithaca smart account; the
-// account signs rail-B contract calls as ERC-7821 intents (encodings proven in
-// contracts/test/IthacaRoot.t.sol + scripts/root-smoke.ts). Rail-A Gateway payments are
-// EOA-only (ecrecover), so passkey sessions do stake/claim, not x402 pay.
-//
-// This context tracks whether a passkey account is connected and exposes its address.
-// The actual enrollment (create credential → authorize on an Ithaca account → fund) is a
-// server-assisted flow wired in PasskeyEnroll; here we hold the resulting session.
+// Passkey session — built on Porto's Key module (porto/viem/Key) over the ithacaxyz/account
+// contract we deployed on Arc. The passkey is a WebAuthn-P256 super-admin on a per-user
+// EIP-7702 Ithaca account; ENGYE self-relays intents (Porto's hosted relay doesn't serve Arc).
 import { createContext, useContext, useState, type ReactNode } from "react";
-import type { Address } from "viem";
+import type { Address, Hex } from "viem";
 
 export interface PasskeySession {
-  address: Address; // the user's Ithaca smart-account address
-  credentialId: string; // base64url WebAuthn credential id
-  pubKey: { x: string; y: string }; // P-256 public key, hex
+  address: Address; // the user's Ithaca smart-account (EOA) address
+  credentialId: string; // WebAuthn credential id (base64url, from Porto/ox)
+  credentialPublicKey: Hex; // ox PublicKey hex — reconstructs the key for signing
 }
 
 interface PasskeyCtx {

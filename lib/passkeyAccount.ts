@@ -13,7 +13,10 @@ import {
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { arcTestnet } from "viem/chains";
 import { supabaseAdmin } from "./db";
-import { ithacaAbi, passkeyKeyFor, packExecutionData, ERC7821_MODE, type Call } from "./ithaca";
+import { ithacaAbi, packExecutionData, ERC7821_MODE, type Call } from "./ithaca";
+
+/** Porto's serialized key (Key.serialize output) — the ithacaxyz/account Key struct. */
+export interface SerializedKey { expiry: number; keyType: number; isSuperAdmin: boolean; publicKey: Hex }
 
 const ITHACA_IMPL = process.env.ITHACA_IMPL as Address;
 const USDC = (process.env.USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000") as Address;
@@ -31,7 +34,7 @@ function relayer() {
   };
 }
 
-export async function provisionPasskeyAccount(pubKey: { x: string; y: string }, credentialId: string): Promise<Address> {
+export async function provisionPasskeyAccount(key: SerializedKey, credentialId: string): Promise<Address> {
   if (!supabaseAdmin) throw new Error("persistence unavailable");
   const { data: existing } = await supabaseAdmin.from("passkey_accounts").select("account").eq("credential_id", credentialId).maybeSingle();
   if (existing?.account) return existing.account as Address;
@@ -45,9 +48,9 @@ export async function provisionPasskeyAccount(pubKey: { x: string; y: string }, 
   const delegateHash = await wallet.sendTransaction({ to: u.address, value: 0n, data: "0x", authorizationList: [authorization] });
   await pub.waitForTransactionReceipt({ hash: delegateHash });
 
-  // 2. authorize the passkey as super-admin, signed by u's own key (raw-ECDSA root branch)
-  const key = passkeyKeyFor(pubKey.x, pubKey.y);
-  const calls: Call[] = [{ to: u.address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [key] }) }];
+  // 2. authorize the passkey (Porto's serialized Key) as super-admin, signed by u (raw-ECDSA root branch)
+  const authorizeKey = { expiry: key.expiry, keyType: key.keyType, isSuperAdmin: key.isSuperAdmin, publicKey: key.publicKey };
+  const calls: Call[] = [{ to: u.address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [authorizeKey] }) }];
   const nonce = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
   const digest = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
   const sig = await u.sign({ hash: digest });
@@ -63,15 +66,18 @@ export async function provisionPasskeyAccount(pubKey: { x: string; y: string }, 
     console.warn("[passkey] demo USDC sponsor skipped:", e instanceof Error ? e.message : e);
   }
 
-  // 4. persist mapping; u's key is discarded (never stored) — passkey is sole controller
-  await supabaseAdmin.from("passkey_accounts").insert({ credential_id: credentialId, account: u.address, pub_x: pubKey.x, pub_y: pubKey.y });
+  // 4. persist mapping (account lowercased for case-stable lookups); u's key is discarded
+  const { error } = await supabaseAdmin.from("passkey_accounts").insert({
+    credential_id: credentialId, account: u.address.toLowerCase(), pub_x: key.publicKey.slice(0, 66), pub_y: "0x" + key.publicKey.slice(66),
+  });
+  if (error) throw new Error(`passkey account persist failed: ${error.message}`);
   return u.address;
 }
 
 /** Relay a passkey-signed intent (only for accounts we provisioned — don't sponsor arbitrary gas). */
 export async function relayPasskeyExecute(account: Address, executionData: Hex): Promise<Hex> {
   if (!supabaseAdmin) throw new Error("persistence unavailable");
-  const { data: known } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", account).maybeSingle();
+  const { data: known } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", account.toLowerCase()).maybeSingle();
   if (!known) throw new Error("unknown passkey account");
   const { pub, wallet } = relayer();
   const hash = await wallet.writeContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });

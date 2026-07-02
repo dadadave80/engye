@@ -8,7 +8,12 @@ export const maxDuration = 60;
 
 const schema = z.object({
   credentialId: z.string().min(8).max(512),
-  pubKey: z.object({ x: z.string().regex(/^0x[0-9a-fA-F]+$/), y: z.string().regex(/^0x[0-9a-fA-F]+$/) }),
+  key: z.object({
+    expiry: z.number().int().nonnegative(),
+    keyType: z.number().int().min(0).max(3),
+    isSuperAdmin: z.boolean(),
+    publicKey: z.string().regex(/^0x[0-9a-fA-F]+$/),
+  }),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -17,7 +22,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
   try {
-    const account = await provisionPasskeyAccount(parsed.data.pubKey, parsed.data.credentialId);
+    const account = await provisionPasskeyAccount({ ...parsed.data.key, publicKey: parsed.data.key.publicKey as `0x${string}` }, parsed.data.credentialId);
     return NextResponse.json({ account });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
