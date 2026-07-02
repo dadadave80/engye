@@ -19,8 +19,13 @@ contract Deploy is Script {
         address vault = vm.deployCode("RefundVault.vy:RefundVault", args);
         address stake = vm.deployCode("ProviderStake.vy:ProviderStake", args);
         address delegate = vm.deployCode("SessionAccount.vy:SessionAccount");
-        // orchestrator(0): we don't use Ithaca's gas-sponsored relay; session EOA relays intents
-        address ithaca = address(new IthacaAccount(address(0)));
+        // orchestrator(0): we don't use Ithaca's gas-sponsored relay; session EOA relays intents.
+        // Skipped when ITHACA_IMPL is already live — the root's delegation points at it,
+        // and re-pointing costs a keystore signature only the human can produce.
+        address ithaca = vm.envOr("ITHACA_IMPL", address(0));
+        if (ithaca == address(0)) {
+            ithaca = address(new IthacaAccount(address(0)));
+        }
         vm.stopBroadcast();
 
         console.log("ESCROW_ADDRESS=", escrow);

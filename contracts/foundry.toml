@@ -10,8 +10,9 @@ optimizer_runs = 200
 evm_version = "prague"
 
 # pinned toolchain: vyper 0.4.3+commit.bff19ea2
-# gas-optimized + Venom IR backend (user directive 2026-07-02)
+# gas-optimized, DEFAULT codegen: Arcscan's verifier schema cannot express Venom
+# (experimentalCodegen silently dropped -> bytecode mismatch), and verified > venom.
+# Revisit when the explorer's smart-contract-verifier upgrades.
 [vyper]
 path = "/Users/dadadave/.local/bin/vyper"
 optimize = "gas"
-experimental_codegen = true
