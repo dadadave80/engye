@@ -100,7 +100,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               <button onClick={() => { connect({ connector: injected() }); onClose(); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser wallet</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>MetaMask · injected <ChevronRight size={14} /></span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>injected wallet <ChevronRight size={14} /></span>
               </button>
               <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none", lineHeight: 1.4 }}>
