@@ -2,18 +2,12 @@
 pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
+import {IthacaAccount} from "account/IthacaAccount.sol";
 
-/// Deploys the ENGYE contract system (Vyper) to Arc testnet.
-/// Usage: cd contracts && forge script script/Deploy.s.sol --rpc-url "$RPC" --private-key "$BROKER_PRIVATE_KEY" --broadcast
+/// Deploys the full ENGYE contract system to Arc testnet.
+/// Run via scripts/deploy.sh — forge script --verify handles BOTH Vyper and Solidity
+/// verification on Blockscout when contracts are deployed with explicit artifact ids.
 contract Deploy is Script {
-    function _deploy(string memory artifact, bytes memory args) internal returns (address addr) {
-        bytes memory initcode = abi.encodePacked(vm.getCode(artifact), args);
-        assembly {
-            addr := create(0, add(initcode, 0x20), mload(initcode))
-        }
-        require(addr != address(0), "deploy failed");
-    }
-
     function run() external {
         address usdc = vm.envAddress("USDC_ADDRESS");
         // broker treasury doubles as resolver for the hackathon (trust assumption in README)
@@ -21,15 +15,18 @@ contract Deploy is Script {
         bytes memory args = abi.encode(usdc, resolver);
 
         vm.startBroadcast();
-        address escrow = _deploy("BondedEscrow", args);
-        address vault = _deploy("RefundVault", args);
-        address stake = _deploy("ProviderStake", args);
+        address escrow = vm.deployCode("BondedEscrow.vy:BondedEscrow", args);
+        address vault = vm.deployCode("RefundVault.vy:RefundVault", args);
+        address stake = vm.deployCode("ProviderStake.vy:ProviderStake", args);
+        address delegate = vm.deployCode("SessionAccount.vy:SessionAccount");
+        // orchestrator(0): we don't use Ithaca's gas-sponsored relay; session EOA relays intents
+        address ithaca = address(new IthacaAccount(address(0)));
         vm.stopBroadcast();
 
         console.log("ESCROW_ADDRESS=", escrow);
         console.log("REFUND_VAULT_ADDRESS=", vault);
         console.log("PROVIDER_STAKE_ADDRESS=", stake);
-        console.log("usdc:", usdc);
-        console.log("resolver:", resolver);
+        console.log("DELEGATE_ADDRESS=", delegate);
+        console.log("ITHACA_IMPL=", ithaca);
     }
 }

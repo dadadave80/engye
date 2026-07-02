@@ -1,0 +1,3 @@
+[submodule "contracts/lib/account"]
+	path = contracts/lib/account
+	url = https://github.com/ithacaxyz/account

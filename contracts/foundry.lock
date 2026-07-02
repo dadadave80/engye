@@ -1,0 +1,8 @@
+{
+  "lib/account": {
+    "tag": {
+      "name": "v0.5.7",
+      "rev": "7997f6ab22dc0076be4e0ee7a6cbd4cb7e12b591"
+    }
+  }
+}
