@@ -78,7 +78,7 @@ The human's funded keystore EOA is the **root**; it 7702-delegates to a verified
 
 ## Circle stack used
 
-Gateway Nanopayments (`@circle-fin/x402-batching`, gasless x402, batched settlement) · USDC-native gas on Arc · five Vyper contracts deployed **and verified** on Arc testnet · canonical ERC-8004 registries · Circle CLI + Circle Skills in the build workflow · faucet-free via EIP-7702.
+Gateway Nanopayments (`@circle-fin/x402-batching`, gasless x402, batched settlement) · USDC-native gas on Arc · five contracts (four Vyper + the Solidity IthacaAccount) deployed **and verified** on Arc testnet · canonical ERC-8004 registries · Circle CLI + Circle Skills in the build workflow · faucet-free via EIP-7702.
 
 ## Become a provider
 
