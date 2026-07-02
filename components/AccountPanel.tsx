@@ -164,6 +164,11 @@ export function AccountPanel() {
               {staked > 0n && <div style={rowStyle}><span style={{ color: "var(--muted-foreground)" }}>Staked (co-insurance)</span><span style={mono}>{fromAtomic(staked).toFixed(4)}</span></div>}
             </div>
           )}
+          {usdc < 1_000000n && (
+            <a href={FAUCET} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none", marginTop: 10 }}>
+              Need more? Claim testnet USDC at the <span style={{ color: "var(--link)" }}>Circle Faucet</span> <ExternalLink size={11} /> <span>(pick Arc Testnet)</span>
+            </a>
+          )}
         </Section>
 
         {/* Permissions = authorized signers (the passkey) */}
