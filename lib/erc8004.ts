@@ -99,14 +99,17 @@ export async function giveFeedback(opts: {
   return hash;
 }
 
+/** Called with the PROVIDER's own key — ERC-8004 only lets an agent's owner request
+ *  validation for that agent ("Not authorized" otherwise, verified on Arc). */
 export async function requestValidation(opts: {
   providerAgentId: bigint;
   requestURI: string;
   matchKey: Hex;
+  providerPrivateKey: string;
 }): Promise<Hex> {
-  const pk = process.env.BROKER_PRIVATE_KEY;
+  const pk = opts.providerPrivateKey;
   const validator = process.env.VALIDATOR_ADDRESS;
-  if (!pk || !validator) throw new Error("BROKER_PRIVATE_KEY / VALIDATOR_ADDRESS missing");
+  if (!pk || !validator) throw new Error("provider key / VALIDATOR_ADDRESS missing");
   const { pub, wallet, account } = clientsFor(pk);
   const hash = await wallet.writeContract({
     address: VALIDATION,

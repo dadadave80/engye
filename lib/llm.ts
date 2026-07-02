@@ -43,6 +43,8 @@ async function groqCall(
 ): Promise<string> {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error("GROQ_API_KEY missing");
+  // gpt-oss models take low/medium/high; qwen3 only accepts none|default
+  const reasoningEffort = model.startsWith("openai/gpt-oss") ? "low" : "none";
   const res = await fetch(GROQ_URL, {
     method: "POST",
     signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -50,7 +52,7 @@ async function groqCall(
     body: JSON.stringify({
       model,
       response_format: { type: "json_object" },
-      reasoning_effort: "low",
+      reasoning_effort: reasoningEffort,
       max_completion_tokens: maxTokens,
       messages: [
         { role: "system", content: system },

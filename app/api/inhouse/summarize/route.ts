@@ -1,18 +1,18 @@
-// In-house provider 1 — cheap, good: quick answers ($0.001).
+// In-house provider 2 — mid-tier summarizer ($0.003).
 import { NextRequest, NextResponse } from "next/server";
 import { protectRoute } from "@/lib/x402";
 import { workTask } from "@/lib/inhouse";
 
 async function handler(req: NextRequest): Promise<NextResponse> {
   const task = await req.json().catch(() => ({}));
-  const deliverable = await workTask(task, "answer");
-  return NextResponse.json({ provider: "engye-inhouse-quote", data: deliverable, ...deliverable });
+  const deliverable = await workTask(task, "summarize");
+  return NextResponse.json({ provider: "engye-inhouse-summarize", ...deliverable });
 }
 
 export const POST = protectRoute(
   handler,
-  0.001,
-  "/api/inhouse/quote",
-  process.env.PROVIDER1_ADDRESS ?? "",
+  0.003,
+  "/api/inhouse/summarize",
+  process.env.PROVIDER2_ADDRESS ?? "",
   "outbound",
 );

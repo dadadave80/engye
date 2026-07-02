@@ -170,4 +170,19 @@ export async function payEndpoint(
   return { price, result };
 }
 
+/** Keep a wallet's Gateway balance funded enough to pay providers (auto-deposit like the sample). */
+export async function ensureGatewayFloat(
+  walletPrivateKey: string,
+  minUsdc = 0.2,
+  topUpUsdc = 1,
+): Promise<void> {
+  const gateway = gatewayFor(walletPrivateKey);
+  const balances = await gateway.getBalances();
+  if (balances.gateway.available >= BigInt(Math.round(minUsdc * 1e6))) return;
+  if (balances.wallet.balance === 0n) {
+    throw new Error("wallet has no USDC to deposit into Gateway");
+  }
+  await gateway.deposit(String(topUpUsdc));
+}
+
 export { gatewayFor };
