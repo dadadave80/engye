@@ -85,8 +85,9 @@ export const passkeyKeyFor = (x: string, y: string): IthacaKey => ({
 
 /** Read the current nonce + ERC-7821 digest for a call batch on any Ithaca account. */
 export async function accountDigest(account: Address, calls: Call[]): Promise<{ digest: Hex; nonce: bigint }> {
-  // server (scripts/API): personal RPC; browser: the public NEXT_PUBLIC RPC
-  const transport = http(process.env.RPC || process.env.NEXT_PUBLIC_RPC_URL || undefined);
+  // server (scripts/API): personal RPC; browser: the public NEXT_PUBLIC RPC. Resilient — the
+  // public RPC is flaky and viem's default 10s/thin-retry surfaced spurious "HTTP request failed".
+  const transport = http(process.env.RPC || process.env.NEXT_PUBLIC_RPC_URL || undefined, { timeout: 20_000, retryCount: 3, retryDelay: 500 });
   const pub = createPublicClient({ chain: arcTestnet, transport });
   const nonce = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
   const digest = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });

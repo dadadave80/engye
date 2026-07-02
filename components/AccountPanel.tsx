@@ -58,18 +58,21 @@ export function AccountPanel() {
   const [busy, setBusy] = useState<string | null>(null); // "add" | `revoke:${hash}`
   const [actErr, setActErr] = useState<string | null>(null);
 
+  // Non-throwing: a flaky read must never surface as an action error. Each read is independent.
   const load = useCallback(async () => {
     if (!address) return;
-    const [u, s] = await Promise.all([
-      publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [address] }),
-      publicClient.readContract({ address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "stakes", args: [address] }).catch(() => 0n),
-    ]);
-    setUsdc(u as bigint); setStaked(s as bigint);
+    try {
+      const [u, s] = await Promise.all([
+        publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [address] }),
+        publicClient.readContract({ address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "stakes", args: [address] }).catch(() => 0n),
+      ]);
+      setUsdc(u as bigint); setStaked(s as bigint);
+    } catch { /* transient read failure — keep last known balances */ }
     if (isPasskey) {
       try {
         const [ks, hashes] = await publicClient.readContract({ address, abi: ithacaKeysAbi, functionName: "getKeys" });
         setKeys(ks.map((k, i) => ({ expiry: Number(k.expiry), keyType: Number(k.keyType), isSuperAdmin: k.isSuperAdmin, hash: hashes[i], publicKey: k.publicKey })));
-      } catch { setKeys([]); }
+      } catch { /* keep last known keys */ }
     }
   }, [address, isPasskey]);
 
@@ -93,22 +96,20 @@ export function AccountPanel() {
     setBusy("add"); setActErr(null);
     try {
       const call: Call = { to: address as Address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [sessionKeyFor(addr)] }) };
-      await send([call]);
-      await load();
-    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
-    finally {
-      setBusy(null);
-      disconnect(); // drop any transient connection made just to read the recovery wallet's address
-    }
+      await send([call]); // the action — its success/failure is authoritative
+    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); setBusy(null); disconnect(); return; }
+    setBusy(null);
+    disconnect(); // drop any transient connection made just to read the recovery wallet's address
+    void load(); // refresh separately — a read failure here is non-fatal, not an action error
   }
   async function revokeKey(hash: `0x${string}`) {
     setBusy(`revoke:${hash}`); setActErr(null);
     try {
       const call: Call = { to: address as Address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "revoke", args: [hash] }) };
       await send([call]);
-      await load();
-    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
-    finally { setBusy(null); }
+    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); setBusy(null); return; }
+    setBusy(null);
+    void load();
   }
 
   if (!wallet.connected || !address) {
