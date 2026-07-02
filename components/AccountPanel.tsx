@@ -96,7 +96,10 @@ export function AccountPanel() {
       await send([call]);
       await load();
     } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
-    finally { setBusy(null); }
+    finally {
+      setBusy(null);
+      disconnect(); // drop any transient connection made just to read the recovery wallet's address
+    }
   }
   async function revokeKey(hash: `0x${string}`) {
     setBusy(`revoke:${hash}`); setActErr(null);

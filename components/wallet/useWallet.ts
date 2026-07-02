@@ -19,11 +19,14 @@ export function useWallet(): WalletView {
   const { address: eoa, isConnected } = useAccount();
   const { current } = usePasskey();
 
-  if (isConnected && eoa) {
-    return { address: eoa, kind: "eoa", connected: true, canPayGateway: true };
-  }
+  // A passkey session is the user's identity — it takes precedence over a transient EOA
+  // connection (e.g. a wallet connected only to pick a recovery method). Otherwise adding
+  // recovery would hijack the active account and unmount the flow mid-way.
   if (current) {
     return { address: current.address, kind: "passkey", connected: true, canPayGateway: false };
+  }
+  if (isConnected && eoa) {
+    return { address: eoa, kind: "eoa", connected: true, canPayGateway: true };
   }
   return { address: null, kind: null, connected: false, canPayGateway: false };
 }
