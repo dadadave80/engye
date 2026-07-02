@@ -45,8 +45,20 @@ export async function POST(
   const endpoint = `/api/broker/execute/${id}`;
   const requirements = buildRequirements(Number(quote.total_price_usdc), process.env.BROKER_ADDRESS!);
   if (!req.headers.get("payment-signature")) return paymentRequired(endpoint, requirements);
+
+  // atomic claim BEFORE taking payment — a concurrent retry of the same quote can't double-execute
+  // (conditional update: only the request that flips open→executing proceeds).
+  const { data: claimed } = await supabaseAdmin
+    .from("quotes").update({ status: "executing" }).eq("id", id).eq("status", "open").select();
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json({ error: "quote already claimed, executed, or expired" }, { status: 409 });
+  }
+
   const paid = await verifyAndSettle(req, requirements, endpoint, "inbound");
-  if (!paid.ok) return NextResponse.json({ error: paid.error }, { status: paid.status });
+  if (!paid.ok) {
+    await supabaseAdmin.from("quotes").update({ status: "open" }).eq("id", id); // release for retry
+    return NextResponse.json({ error: paid.error }, { status: paid.status });
+  }
 
   const requester = (quote.requester_wallet ?? paid.payer) as Address;
   const bonded = quote.action === "accept";
@@ -70,7 +82,7 @@ export async function POST(
       source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
     })
     .select().single();
-  await supabaseAdmin.from("quotes").update({ status: "executed" }).eq("id", id);
+  await supabaseAdmin.from("quotes").update({ status: "executed" }).eq("id", id); // was 'executing'
 
   const txs: Record<string, string> = {};
   try {
