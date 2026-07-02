@@ -28,6 +28,17 @@ export const escrowAbi = [
   ] },
 ] as const;
 
+// IthacaAccount key enumeration — for the account page's "Permissions" (authorized signers)
+export const ithacaKeysAbi = [
+  { type: "function", name: "getKeys", stateMutability: "view", inputs: [], outputs: [
+    { name: "keys", type: "tuple[]", components: [
+      { name: "expiry", type: "uint40" }, { name: "keyType", type: "uint8" },
+      { name: "isSuperAdmin", type: "bool" }, { name: "publicKey", type: "bytes" },
+    ] },
+    { name: "keyHashes", type: "bytes32[]" },
+  ] },
+] as const;
+
 export const gatewayWalletAbi = [
   { type: "function", name: "deposit", stateMutability: "nonpayable", inputs: [{ name: "token", type: "address" }, { name: "value", type: "uint256" }], outputs: [] },
 ] as const;

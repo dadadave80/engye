@@ -37,6 +37,7 @@ export function ConnectButton() {
         </button>
         {menu && (
           <div style={{ position: "absolute", right: 0, top: 40, minWidth: 190, background: "var(--popover)", border: "1px solid var(--border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow-popover)", zIndex: 20 }}>
+            <a href="/account" style={{ ...item, textDecoration: "none" }} onClick={() => setMenu(false)}>View account</a>
             <button style={item} onClick={() => { navigator.clipboard?.writeText(wallet.address!); setMenu(false); }}>Copy address</button>
             {wallet.kind === "passkey" && accounts.length > 1 && (
               <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Switch account</button>

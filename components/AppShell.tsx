@@ -11,6 +11,7 @@ const NAV = [
   { label: "Providers", href: "/providers" },
   { label: "Stake", href: "/stake" },
   { label: "Calibration", href: "/calibration" },
+  { label: "Account", href: "/account" },
 ];
 
 export function AppShell({ settled, children }: { settled?: number; children: ReactNode }) {
