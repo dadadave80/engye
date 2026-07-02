@@ -1,17 +1,16 @@
 "use client";
-// Flow 3 — anyone can rescue a stuck bond. Past its deadline, an OPEN bond's funds go to the
-// requester via the permissionless claim_timeout(); this proves the escrow isn't server-puppeted.
+// Flow 3 — anyone can rescue a stuck bond (permissionless claim_timeout). EOA or passkey.
 import { useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { encodeFunctionData } from "viem";
 import { Card, Button, Input, Eyebrow } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
+import { useAccountActions } from "./wallet/useAccountActions";
 import { publicClient, ESCROW, escrowAbi, fromAtomic, ARCSCAN } from "@/lib/clientChain";
 
 const STATUS = ["", "OPEN", "RELEASED", "SLASHED", "TIMEOUT_CLAIMED"];
 
 export function ClaimCard() {
-  const { isConnected } = useAccount();
-  const { data: wallet } = useWalletClient();
+  const { send, wallet } = useAccountActions();
   const [key, setKey] = useState("");
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -28,11 +27,9 @@ export function ClaimCard() {
   }
 
   async function claim() {
-    if (!wallet) return;
     setBusy(true); setMsg(null);
     try {
-      const hash = await wallet.writeContract({ account: wallet.account, chain: wallet.chain, address: ESCROW, abi: escrowAbi, functionName: "claim_timeout", args: [key as `0x${string}`] });
-      await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await send([{ to: ESCROW, value: 0n, data: encodeFunctionData({ abi: escrowAbi, functionName: "claim_timeout", args: [key as `0x${string}`] }) }]);
       setMsg({ text: "Rescued — bond sent to the requester", tx: hash });
     } catch (e) { setMsg({ text: e instanceof Error ? e.message.split("\n")[0] : String(e), err: true }); }
     finally { setBusy(false); }
@@ -46,7 +43,7 @@ export function ClaimCard() {
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}><Input label="Match key (bytes32)" mono placeholder="0x…" value={key} onChange={(e) => setKey(e.target.value)} /></div>
           <Button variant="outline" size="sm" onClick={inspect} disabled={!key}>Inspect</Button>
-          {isConnected
+          {wallet.connected
             ? <Button size="sm" onClick={claim} disabled={busy || !key}>{busy ? "Claiming…" : "Claim for requester"}</Button>
             : <ConnectButton />}
         </div>

@@ -1,0 +1,81 @@
+// Server: provision + relay for passkey-controlled Ithaca accounts (the research-verified path).
+// Provisioning per new passkey user:
+//   1. mint a throwaway EOA `u` — its address IS the user's account address
+//   2. ENGYE relayer sponsors a type-4 tx delegating `u` → the deployed IthacaAccount impl
+//   3. ENGYE relays an execute() intent SIGNED BY u's own key that authorizes the passkey as
+//      a super-admin (the raw-ECDSA root branch: recover(digest,sig)==address(this))
+//   4. DISCARD u's key (non-custodial — the passkey is the sole controller from here on)
+// Then all future passkey-signed intents are relayed by ENGYE (users need no gas).
+import {
+  createPublicClient, createWalletClient, http, encodeFunctionData, erc20Abi,
+  type Address, type Hex,
+} from "viem";
+import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
+import { arcTestnet } from "viem/chains";
+import { supabaseAdmin } from "./db";
+import { ithacaAbi, passkeyKeyFor, packExecutionData, ERC7821_MODE, type Call } from "./ithaca";
+
+const ITHACA_IMPL = process.env.ITHACA_IMPL as Address;
+const USDC = (process.env.USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000") as Address;
+const DEMO_STAKE_SPONSOR = 1_000000n; // 1 USDC so a fresh passkey user can try staking (testnet demo)
+
+function relayer() {
+  const pk = process.env.BROKER_PRIVATE_KEY as Hex;
+  if (!pk) throw new Error("BROKER_PRIVATE_KEY (relayer) missing");
+  const account = privateKeyToAccount(pk);
+  const transport = http(process.env.RPC ?? undefined);
+  return {
+    account,
+    pub: createPublicClient({ chain: arcTestnet, transport }),
+    wallet: createWalletClient({ chain: arcTestnet, transport, account }),
+  };
+}
+
+export async function provisionPasskeyAccount(pubKey: { x: string; y: string }, credentialId: string): Promise<Address> {
+  if (!supabaseAdmin) throw new Error("persistence unavailable");
+  const { data: existing } = await supabaseAdmin.from("passkey_accounts").select("account").eq("credential_id", credentialId).maybeSingle();
+  if (existing?.account) return existing.account as Address;
+
+  const { pub, wallet } = relayer();
+  const u = privateKeyToAccount(generatePrivateKey());
+
+  // 1. delegate u → IthacaAccount (u authorizes; relayer submits + pays gas)
+  const authNonce = await pub.getTransactionCount({ address: u.address });
+  const authorization = await u.signAuthorization({ contractAddress: ITHACA_IMPL, chainId: arcTestnet.id, nonce: authNonce });
+  const delegateHash = await wallet.sendTransaction({ to: u.address, value: 0n, data: "0x", authorizationList: [authorization] });
+  await pub.waitForTransactionReceipt({ hash: delegateHash });
+
+  // 2. authorize the passkey as super-admin, signed by u's own key (raw-ECDSA root branch)
+  const key = passkeyKeyFor(pubKey.x, pubKey.y);
+  const calls: Call[] = [{ to: u.address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [key] }) }];
+  const nonce = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
+  const digest = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
+  const sig = await u.sign({ hash: digest });
+  const executionData = packExecutionData(calls, nonce, sig);
+  const authorizeHash = await wallet.writeContract({ address: u.address, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });
+  await pub.waitForTransactionReceipt({ hash: authorizeHash });
+
+  // 3. sponsor a little USDC so the demo stake works (the account, not gas, needs USDC to stake)
+  try {
+    const sponsorHash = await wallet.writeContract({ address: USDC, abi: erc20Abi, functionName: "transfer", args: [u.address, DEMO_STAKE_SPONSOR] });
+    await pub.waitForTransactionReceipt({ hash: sponsorHash });
+  } catch (e) {
+    console.warn("[passkey] demo USDC sponsor skipped:", e instanceof Error ? e.message : e);
+  }
+
+  // 4. persist mapping; u's key is discarded (never stored) — passkey is sole controller
+  await supabaseAdmin.from("passkey_accounts").insert({ credential_id: credentialId, account: u.address, pub_x: pubKey.x, pub_y: pubKey.y });
+  return u.address;
+}
+
+/** Relay a passkey-signed intent (only for accounts we provisioned — don't sponsor arbitrary gas). */
+export async function relayPasskeyExecute(account: Address, executionData: Hex): Promise<Hex> {
+  if (!supabaseAdmin) throw new Error("persistence unavailable");
+  const { data: known } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", account).maybeSingle();
+  if (!known) throw new Error("unknown passkey account");
+  const { pub, wallet } = relayer();
+  const hash = await wallet.writeContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`relayed intent reverted: ${hash}`);
+  return hash;
+}

@@ -43,14 +43,14 @@ export interface Call {
   data: Hex;
 }
 
-const ithacaAbi = parseAbi([
+export const ithacaAbi = parseAbi([
   "function execute(bytes32 mode, bytes executionData) payable",
   "function computeDigest((address to,uint256 value,bytes data)[] calls, uint256 nonce) view returns (bytes32)",
   "function getNonce(uint192 seqKey) view returns (uint256)",
   "function authorize((uint40 expiry,uint8 keyType,bool isSuperAdmin,bytes publicKey) key) returns (bytes32)",
 ]);
 
-const CALLS_PARAM = {
+export const CALLS_PARAM = {
   type: "tuple[]",
   components: [
     { name: "to", type: "address" },
@@ -73,6 +73,29 @@ export const sessionKeyFor = (sessionAddress: Address): IthacaKey => ({
   isSuperAdmin: true,
   publicKey: encodeAbiParameters([{ type: "address" }], [sessionAddress]),
 });
+
+/** WebAuthn P-256 passkey as an Ithaca super-admin key. publicKey = abi.encode(x, y). */
+export const passkeyKeyFor = (x: string, y: string): IthacaKey => ({
+  expiry: 0,
+  keyType: KeyType.WebAuthnP256,
+  isSuperAdmin: true,
+  publicKey: encodeAbiParameters([{ type: "uint256" }, { type: "uint256" }], [BigInt(x), BigInt(y)]),
+});
+
+/** Read the current nonce + ERC-7821 digest for a call batch on any Ithaca account. */
+export async function accountDigest(account: Address, calls: Call[]): Promise<{ digest: Hex; nonce: bigint }> {
+  const transport = http(process.env.NEXT_PUBLIC_RPC_URL || process.env.RPC || undefined);
+  const pub = createPublicClient({ chain: arcTestnet, transport });
+  const nonce = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
+  const digest = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
+  return { digest, nonce };
+}
+
+/** Pack a signed intent's executionData (calls + opData) for execute(MODE, executionData). */
+export function packExecutionData(calls: Call[], nonce: bigint, wrappedSig: Hex): Hex {
+  const opData = encodePacked(["uint256", "bytes"], [nonce, wrappedSig]);
+  return encodeAbiParameters([CALLS_PARAM, { type: "bytes" }], [calls, opData]);
+}
 
 function env() {
   const root = process.env.ROOT_ADDRESS as Address;

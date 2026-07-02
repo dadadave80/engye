@@ -1,19 +1,21 @@
 "use client";
-// Provider co-insurance staking — user-signed rail-B (ProviderStake). Approve + stake,
-// request_unstake (cooldown-gated), withdraw. Reads live stake from chain.
+// Provider co-insurance staking — user-signed rail-B, EOA OR passkey (via useAccountActions).
+// Approve + stake batches into one passkey intent, or two EOA txs. Reads live stake from chain.
 import { useEffect, useState } from "react";
-import { useAccount, useWalletClient } from "wagmi";
+import { encodeFunctionData } from "viem";
 import { Card, Button, Input, Eyebrow } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
+import { useAccountActions } from "./wallet/useAccountActions";
 import {
   publicClient, PROVIDER_STAKE, USDC, erc20Abi, providerStakeAbi, usdcAtomic, fromAtomic, ARCSCAN,
 } from "@/lib/clientChain";
+import type { Call } from "@/lib/ithaca";
 
 const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 14, padding: "6px 0" };
 
 export function StakePanel() {
-  const { address, isConnected } = useAccount();
-  const { data: wallet } = useWalletClient();
+  const { send, wallet } = useAccountActions();
+  const address = wallet.address;
   const [staked, setStaked] = useState<bigint>(0n);
   const [pending, setPending] = useState<{ amount: bigint; unlock: bigint }>({ amount: 0n, unlock: 0n });
   const [usdcBal, setUsdcBal] = useState<bigint>(0n);
@@ -34,12 +36,10 @@ export function StakePanel() {
   }
   useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [address]);
 
-  async function run(label: string, fn: () => Promise<`0x${string}`>) {
-    if (!wallet) return;
+  async function run(label: string, calls: Call[]) {
     setBusy(label); setMsg(null);
     try {
-      const hash = await fn();
-      await publicClient.waitForTransactionReceipt({ hash });
+      const hash = await send(calls);
       setMsg({ text: `${label} confirmed`, tx: hash });
       await refresh();
     } catch (e) {
@@ -47,19 +47,22 @@ export function StakePanel() {
     } finally { setBusy(null); }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const call = (to: `0x${string}`, abi: any, fn: string, args: readonly unknown[]): Call =>
+    ({ to, value: 0n, data: encodeFunctionData({ abi, functionName: fn, args: args as never }) });
+
   async function stake() {
-    if (!wallet || !address) return;
     const atomic = usdcAtomic(Number(amount));
     if (atomic <= 0n) return;
-    const allowance = await publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [address, PROVIDER_STAKE] });
-    if ((allowance as bigint) < atomic) {
-      await run("Approve", () => wallet.writeContract({ account: wallet.account, chain: wallet.chain, address: USDC, abi: erc20Abi, functionName: "approve", args: [PROVIDER_STAKE, atomic] }));
-    }
-    await run("Stake", () => wallet.writeContract({ account: wallet.account, chain: wallet.chain, address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "stake", args: [atomic] }));
+    // approve + stake — one batched passkey intent, or two sequential EOA txs
+    await run("Stake", [
+      call(USDC, erc20Abi, "approve", [PROVIDER_STAKE, atomic]),
+      call(PROVIDER_STAKE, providerStakeAbi, "stake", [atomic]),
+    ]);
     setAmount("");
   }
 
-  if (!isConnected) {
+  if (!wallet.connected) {
     return (
       <Card padding={24}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
@@ -78,22 +81,23 @@ export function StakePanel() {
   return (
     <Card padding={24}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {wallet.kind === "passkey" && <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Passkey account · ENGYE relays gas · signed with your device</div>}
         <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Your stake</span><span>{fromAtomic(staked).toFixed(4)} USDC</span></div>
-        <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Wallet USDC</span><span>{fromAtomic(usdcBal).toFixed(4)} USDC</span></div>
+        <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Account USDC</span><span>{fromAtomic(usdcBal).toFixed(4)} USDC</span></div>
         {pending.amount > 0n && (
           <div style={{ ...row, color: "var(--gold-lifted)" }}><span>Unstaking</span><span>{fromAtomic(pending.amount).toFixed(4)} · {canWithdraw ? "ready" : `${Math.ceil(cooldownLeft / 60)}m cooldown`}</span></div>
         )}
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
           <div style={{ flex: 1 }}><Input label="Amount (USDC)" mono placeholder="1.0" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-          <Button disabled={busy !== null || !amount} onClick={stake}>{busy === "Stake" || busy === "Approve" ? `${busy}…` : "Stake"}</Button>
+          <Button disabled={busy !== null || !amount} onClick={stake}>{busy === "Stake" ? "Staking…" : "Stake"}</Button>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
           <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount}
-            onClick={() => run("Unstake request", () => wallet!.writeContract({ account: wallet!.account, chain: wallet!.chain, address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "request_unstake", args: [usdcAtomic(Number(amount))] }))}>
+            onClick={() => run("Unstake request", [call(PROVIDER_STAKE, providerStakeAbi, "request_unstake", [usdcAtomic(Number(amount))])])}>
             Request unstake
           </Button>
           <Button variant="outline" size="sm" disabled={busy !== null || !canWithdraw}
-            onClick={() => run("Withdraw", () => wallet!.writeContract({ account: wallet!.account, chain: wallet!.chain, address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "withdraw", args: [] }))}>
+            onClick={() => run("Withdraw", [call(PROVIDER_STAKE, providerStakeAbi, "withdraw", [])])}>
             Withdraw
           </Button>
         </div>
