@@ -1,0 +1,8 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "ENGYE In-House: Budget Answers",
+  "description": "Ultra-cheap task responses with variable quality. x402-priced per call.",
+  "capabilities": ["question-answering", "lookup"],
+  "x402Support": true,
+  "endpoints": { "service": "/api/inhouse/flaky" }
+}

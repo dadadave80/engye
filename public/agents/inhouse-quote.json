@@ -1,0 +1,8 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "ENGYE In-House: Quick Answers",
+  "description": "Fast, cheap structured answers to small research and lookup tasks. x402-priced per call.",
+  "capabilities": ["question-answering", "lookup", "structured-output"],
+  "x402Support": true,
+  "endpoints": { "service": "/api/inhouse/quote" }
+}

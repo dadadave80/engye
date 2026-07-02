@@ -1,0 +1,8 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "ENGYE In-House: Summarizer",
+  "description": "Mid-tier summarization of provided text into structured briefs. x402-priced per call.",
+  "capabilities": ["summarization", "structured-output"],
+  "x402Support": true,
+  "endpoints": { "service": "/api/inhouse/summarize" }
+}

@@ -1,0 +1,8 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "ENGYE Validator",
+  "description": "Blind, injection-hardened deliverable scoring for ENGYE matches. Posts verdicts to the canonical ERC-8004 Validation Registry on Arc; verdicts drive BondedEscrow release/slash.",
+  "capabilities": ["work-validation", "scoring"],
+  "x402Support": false,
+  "endpoints": {}
+}

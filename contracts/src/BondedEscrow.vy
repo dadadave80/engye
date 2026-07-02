@@ -1,8 +1,11 @@
 # pragma version 0.4.3
 """
 @title ENGYE BondedEscrow
-@notice The broker posts a USDC bond per match, sized by its own confidence.
+@notice The broker posts a USDC bond per match, sized by its own confidence, and
+        commits the hash of its full decision reasoning on-chain before money moves.
         The resolver settles: release -> bond poster, slash -> requester.
+        If the resolver goes silent past the deadline, ANYONE can claim the bond
+        for the requester — the requester never depends on the broker staying honest.
 @dev USDC on Arc testnet is the native asset's ERC-20 interface (6 decimals).
 """
 
@@ -11,18 +14,23 @@ from ethereum.ercs import IERC20
 STATUS_OPEN: constant(uint8) = 1
 STATUS_RELEASED: constant(uint8) = 2
 STATUS_SLASHED: constant(uint8) = 3
+STATUS_TIMEOUT_CLAIMED: constant(uint8) = 4
 
 struct Bond:
     poster: address
     requester: address
     amount: uint256
     status: uint8
+    decision_hash: bytes32  # keccak256 of the broker's full decision JSON — tamper-evident AI audit trail
+    deadline: uint256       # unix time after which claim_timeout() opens
 
 event BondPosted:
     match_id: indexed(bytes32)
     poster: indexed(address)
     requester: indexed(address)
     amount: uint256
+    decision_hash: bytes32
+    deadline: uint256
 
 event BondReleased:
     match_id: indexed(bytes32)
@@ -32,6 +40,12 @@ event BondReleased:
 event BondSlashed:
     match_id: indexed(bytes32)
     requester: indexed(address)
+    amount: uint256
+
+event BondTimeoutClaimed:
+    match_id: indexed(bytes32)
+    requester: indexed(address)
+    caller: indexed(address)
     amount: uint256
 
 usdc: public(immutable(IERC20))
@@ -46,14 +60,34 @@ def __init__(usdc_addr: address, resolver_addr: address):
     resolver = resolver_addr
 
 @external
-def create_bond(match_id: bytes32, amount: uint256, requester: address):
+def create_bond(
+    match_id: bytes32,
+    amount: uint256,
+    requester: address,
+    decision_hash: bytes32,
+    deadline: uint256,
+):
     assert amount > 0, "zero amount"
     assert requester != empty(address), "zero requester"
+    assert decision_hash != empty(bytes32), "no decision"
+    assert deadline > block.timestamp, "past deadline"
     assert self.bonds[match_id].status == 0, "bond exists"
     self.bonds[match_id] = Bond(
-        poster=msg.sender, requester=requester, amount=amount, status=STATUS_OPEN
+        poster=msg.sender,
+        requester=requester,
+        amount=amount,
+        status=STATUS_OPEN,
+        decision_hash=decision_hash,
+        deadline=deadline,
     )
-    log BondPosted(match_id=match_id, poster=msg.sender, requester=requester, amount=amount)
+    log BondPosted(
+        match_id=match_id,
+        poster=msg.sender,
+        requester=requester,
+        amount=amount,
+        decision_hash=decision_hash,
+        deadline=deadline,
+    )
     assert extcall usdc.transferFrom(msg.sender, self, amount), "transferFrom failed"
 
 @external
@@ -72,4 +106,16 @@ def slash(match_id: bytes32):
     assert bond.status == STATUS_OPEN, "not open"
     self.bonds[match_id].status = STATUS_SLASHED
     log BondSlashed(match_id=match_id, requester=bond.requester, amount=bond.amount)
+    assert extcall usdc.transfer(bond.requester, bond.amount), "transfer failed"
+
+@external
+def claim_timeout(match_id: bytes32):
+    # permissionless: any keeper can rescue a stuck match for the requester
+    bond: Bond = self.bonds[match_id]
+    assert bond.status == STATUS_OPEN, "not open"
+    assert block.timestamp >= bond.deadline, "not expired"
+    self.bonds[match_id].status = STATUS_TIMEOUT_CLAIMED
+    log BondTimeoutClaimed(
+        match_id=match_id, requester=bond.requester, caller=msg.sender, amount=bond.amount
+    )
     assert extcall usdc.transfer(bond.requester, bond.amount), "transfer failed"

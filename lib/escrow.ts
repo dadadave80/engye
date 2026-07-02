@@ -4,6 +4,8 @@ import {
   createWalletClient,
   http,
   parseAbi,
+  keccak256,
+  toBytes,
   type Address,
   type Hex,
 } from "viem";
@@ -11,10 +13,11 @@ import { privateKeyToAccount } from "viem/accounts";
 import { arcTestnet } from "viem/chains";
 
 const escrowAbi = parseAbi([
-  "function create_bond(bytes32 matchId, uint256 amount, address requester)",
+  "function create_bond(bytes32 matchId, uint256 amount, address requester, bytes32 decisionHash, uint256 deadline)",
   "function release(bytes32 matchId)",
   "function slash(bytes32 matchId)",
-  "function bonds(bytes32 matchId) view returns (address poster, address requester, uint256 amount, uint8 status)",
+  "function claim_timeout(bytes32 matchId)",
+  "function bonds(bytes32 matchId) view returns (address poster, address requester, uint256 amount, uint8 status, bytes32 decisionHash, uint256 deadline)",
   "function resolver() view returns (address)",
 ]);
 
@@ -48,7 +51,7 @@ function clients() {
 }
 
 async function write(
-  fn: "create_bond" | "release" | "slash",
+  fn: "create_bond" | "release" | "slash" | "claim_timeout",
   args: readonly unknown[],
 ): Promise<Hex> {
   const { pub, wallet, account } = clients();
@@ -84,12 +87,30 @@ export async function ensureAllowance(): Promise<void> {
   await pub.waitForTransactionReceipt({ hash });
 }
 
-export async function createBond(matchId: Hex, amountUsdc: number, requester: Address): Promise<Hex> {
-  return write("create_bond", [matchId, usdcAtomic(amountUsdc), requester]);
+/** keccak256 of the broker's full decision JSON — committed on-chain with the bond. */
+export const decisionHash = (decisionJson: string): Hex => keccak256(toBytes(decisionJson));
+
+export async function createBond(
+  matchId: Hex,
+  amountUsdc: number,
+  requester: Address,
+  decisionJson: string,
+  ttlSeconds = 600,
+): Promise<Hex> {
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + ttlSeconds);
+  return write("create_bond", [
+    matchId,
+    usdcAtomic(amountUsdc),
+    requester,
+    decisionHash(decisionJson),
+    deadline,
+  ]);
 }
 
 export const releaseBond = (matchId: Hex): Promise<Hex> => write("release", [matchId]);
 export const slashBond = (matchId: Hex): Promise<Hex> => write("slash", [matchId]);
+/** Permissionless rescue after deadline — pays the requester even if the resolver is dead. */
+export const claimTimeout = (matchId: Hex): Promise<Hex> => write("claim_timeout", [matchId]);
 
 /** Treasury price refund to the requester (rail B, plain USDC transfer). */
 export async function refundFromTreasury(to: Address, amountUsdc: number): Promise<Hex> {
@@ -108,13 +129,14 @@ export async function refundFromTreasury(to: Address, amountUsdc: number): Promi
 
 export async function getBond(matchId: Hex) {
   const { pub } = clients();
-  const [poster, requester, amount, status] = await pub.readContract({
+  const [poster, requester, amount, status, decision, deadline] = await pub.readContract({
     address: escrowAddress(),
     abi: escrowAbi,
     functionName: "bonds",
     args: [matchId],
   });
-  return { poster, requester, amount, status }; // status: 1 OPEN, 2 RELEASED, 3 SLASHED
+  // status: 1 OPEN, 2 RELEASED, 3 SLASHED, 4 TIMEOUT_CLAIMED
+  return { poster, requester, amount, status, decisionHash: decision, deadline };
 }
 
 export const arcscanTx = (hash: string): string => `https://testnet.arcscan.app/tx/${hash}`;

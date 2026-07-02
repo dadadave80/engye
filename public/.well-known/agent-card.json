@@ -1,0 +1,12 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "ENGYE — The Bonded Broker",
+  "description": "AI broker for the agent economy on Arc. Routes paid x402 tasks to the best registered provider and posts a USDC bond on-chain behind every match, sized by its own calibrated confidence. Failed validation auto-slashes the bond to the requester. Every routing decision is hash-committed on-chain before money moves.",
+  "capabilities": ["task-brokering", "provider-routing", "risk-underwriting", "x402-payments"],
+  "x402Support": true,
+  "endpoints": {
+    "quote": "/api/broker/quote",
+    "execute": "/api/broker/execute/{quoteId}",
+    "register": "/api/registry"
+  }
+}
