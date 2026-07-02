@@ -4,10 +4,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { useDisconnect } from "wagmi";
-import { isAddress, encodeFunctionData, decodeAbiParameters, type Address } from "viem";
+import { encodeFunctionData, decodeAbiParameters, type Address } from "viem";
 import { ExternalLink, Copy, Check, ChevronDown, ChevronRight, X } from "lucide-react";
-import { Card, Button, Input, Eyebrow } from "./ui/primitives";
+import { Card, Button, Eyebrow } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
+import { AddRecoveryModal } from "./wallet/AddRecoveryModal";
 import { useWallet } from "./wallet/useWallet";
 import { usePasskey } from "./wallet/passkey";
 import { useAccountActions } from "./wallet/useAccountActions";
@@ -53,7 +54,7 @@ export function AccountPanel() {
   const [staked, setStaked] = useState<bigint>(0n);
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [copied, setCopied] = useState(false);
-  const [newWallet, setNewWallet] = useState("");
+  const [picking, setPicking] = useState(false); // wallet-picker modal open
   const [busy, setBusy] = useState<string | null>(null); // "add" | `revoke:${hash}`
   const [actErr, setActErr] = useState<string | null>(null);
 
@@ -83,16 +84,16 @@ export function AccountPanel() {
   }
   function signOff() { wallet.kind === "eoa" ? disconnect() : signOut(); }
 
-  // Recovery: authorize a backup wallet as a super-admin secp256k1 key (passkey signs; ENGYE relays)
-  async function addRecovery() {
-    const addr = newWallet.trim();
-    if (!isAddress(addr)) { setActErr("Enter a valid wallet address (0x…)."); return; }
-    if (address && addr.toLowerCase() === address.toLowerCase()) { setActErr("That's this account."); return; }
+  // Recovery: authorize a connected backup wallet as a super-admin secp256k1 key (passkey signs; ENGYE relays)
+  async function addRecovery(addr: `0x${string}`) {
+    if (address && addr.toLowerCase() === address.toLowerCase()) { setActErr("That's this account — pick a different wallet."); return; }
+    if (keys.some((k) => k.keyType === KeyType.Secp256k1 && (decodeAbiParameters([{ type: "address" }], k.publicKey)[0] as string).toLowerCase() === addr.toLowerCase())) {
+      setActErr("That wallet is already a recovery method."); return;
+    }
     setBusy("add"); setActErr(null);
     try {
       const call: Call = { to: address as Address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [sessionKeyFor(addr)] }) };
       await send([call]);
-      setNewWallet("");
       await load();
     } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
     finally { setBusy(null); }
@@ -179,14 +180,14 @@ export function AccountPanel() {
         </Section>
 
         {/* Recovery = backup wallets (secp256k1 super-admin keys) — passkey accounts only */}
-        <Section title="Recovery">
+        <Section title="Recovery" action={isPasskey ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => { setActErr(null); setPicking(true); }}>{busy === "add" ? "Signing…" : "Add wallet"}</Button> : undefined}>
           {!isPasskey ? (
             <div style={empty}>Recovery wallets are available for passkey accounts.</div>
+          ) : recoveryWallets.length === 0 ? (
+            <div style={empty}>No recovery methods added yet.</div>
           ) : (
             <div>
-              {recoveryWallets.length === 0 ? (
-                <div style={empty}>No recovery methods added yet.</div>
-              ) : recoveryWallets.map((k) => {
+              {recoveryWallets.map((k) => {
                 const addr = decodeAbiParameters([{ type: "address" }], k.publicKey)[0] as string;
                 return (
                   <div key={k.hash} style={rowStyle}>
@@ -201,20 +202,13 @@ export function AccountPanel() {
                   </div>
                 );
               })}
-              {/* Add wallet */}
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end", marginTop: 12 }}>
-                <div style={{ flex: 1 }}><Input label="Add a backup wallet (0x…)" mono placeholder="0xabc…" value={newWallet} onChange={(e) => setNewWallet(e.target.value)} /></div>
-                <Button size="sm" disabled={busy !== null || !newWallet} onClick={addRecovery}>{busy === "add" ? "Signing…" : "Add wallet"}</Button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--muted-foreground)", marginTop: 8, lineHeight: 1.5 }}>
-                A backup wallet becomes a super-admin signer on this account — it can sign and recover if your passkey is lost. You sign with your passkey; ENGYE relays gas.
-              </p>
             </div>
           )}
         </Section>
 
         {actErr && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)", marginTop: 8 }}>{actErr}</div>}
       </div>
+      {picking && <AddRecoveryModal onSelect={addRecovery} onClose={() => setPicking(false)} />}
     </Card>
   );
 }
