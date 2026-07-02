@@ -43,7 +43,7 @@ export function PostTaskForm() {
     if (!wallet || !quote || quote.declined) return;
     setBusy("pay"); setErr(null);
     try {
-      await ensureGatewayFloat(wallet, 0.05, Math.max(0.5, quote.total_price_usdc * 4));
+      await ensureGatewayFloat(wallet, Math.max(0.5, quote.total_price_usdc * 4));
       const res = await payX402(wallet, `/api/broker/execute/${quote.quote_id}`, { method: "POST", body: "{}" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? body.error ?? "execution failed");

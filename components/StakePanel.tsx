@@ -18,6 +18,7 @@ export function StakePanel() {
   const address = wallet.address;
   const [staked, setStaked] = useState<bigint>(0n);
   const [pending, setPending] = useState<{ amount: bigint; unlock: bigint }>({ amount: 0n, unlock: 0n });
+  const [cooldown, setCooldown] = useState<{ left: number; canWithdraw: boolean }>({ left: 0, canWithdraw: false });
   const [usdcBal, setUsdcBal] = useState<bigint>(0n);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -30,11 +31,15 @@ export function StakePanel() {
       publicClient.readContract({ address: PROVIDER_STAKE, abi: providerStakeAbi, functionName: "pending", args: [address] }),
       publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [address] }),
     ]);
+    const [amt, unlock] = p as [bigint, bigint];
+    const left = Number(unlock) - Math.floor(Date.now() / 1000); // time read in the async refresh, not render
     setStaked(s as bigint);
-    setPending({ amount: (p as [bigint, bigint])[0], unlock: (p as [bigint, bigint])[1] });
+    setPending({ amount: amt, unlock });
+    setCooldown({ left, canWithdraw: amt > 0n && left <= 0 });
     setUsdcBal(b as bigint);
   }
-  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [address]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setState runs after await, not synchronously
+  useEffect(() => { void refresh(); }, [address]);
 
   async function run(label: string, calls: Call[]) {
     setBusy(label); setMsg(null);
@@ -74,9 +79,7 @@ export function StakePanel() {
     );
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  const cooldownLeft = Number(pending.unlock) - now;
-  const canWithdraw = pending.amount > 0n && cooldownLeft <= 0;
+  const { left: cooldownLeft, canWithdraw } = cooldown;
 
   return (
     <Card padding={24}>

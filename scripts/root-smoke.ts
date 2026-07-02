@@ -74,7 +74,7 @@ const signBase = Buffer.concat([
 const sigRaw = new Uint8Array(
   await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, keyPair.privateKey, signBase),
 );
-let r = BigInt("0x" + Buffer.from(sigRaw.slice(0, 32)).toString("hex"));
+const r = BigInt("0x" + Buffer.from(sigRaw.slice(0, 32)).toString("hex"));
 let s = BigInt("0x" + Buffer.from(sigRaw.slice(32, 64)).toString("hex"));
 if (s > P256_N / 2n) s = P256_N - s; // low-s normalization (solady rejects high s)
 

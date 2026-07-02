@@ -3,7 +3,7 @@
 // Runs against APP_URL (override: APP_URL=http://localhost:3000 bun scripts/match-test.ts).
 import { createPublicClient, http, type Address, type Hex } from "viem";
 import { arcTestnet } from "viem/chains";
-import { payEndpoint, ensureGatewayFloat, quotePrice } from "../lib/x402";
+import { payEndpoint, ensureGatewayFloat } from "../lib/x402";
 import { getBond } from "../lib/escrow";
 
 const APP = process.env.APP_URL ?? "http://localhost:3000";

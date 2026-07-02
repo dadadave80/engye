@@ -7,11 +7,10 @@ import { publicClient, USDC, GATEWAY_WALLET, gatewayWalletAbi, usdcAtomic } from
 
 /** Ensure the connected wallet has at least `minUsdc` deposited in the Gateway wallet;
  *  if not, approve + deposit `topUpUsdc`. Two wallet-signed txs. */
-export async function ensureGatewayFloat(wallet: WalletClient, minUsdc = 0.05, topUpUsdc = 0.5): Promise<void> {
+export async function ensureGatewayFloat(wallet: WalletClient, topUpUsdc = 0.5): Promise<void> {
   const account = wallet.account!;
-  // Gateway balance is tracked off the deposit; simplest robust check: read the facilitator? For the
-  // hackathon we deposit if the wallet's Gateway balance read is below min. We approximate by always
-  // topping up when the caller signals a shortfall; callers pass minUsdc to gate.
+  // ponytail: always tops up topUpUsdc when called (the caller decides when a top-up is needed);
+  // a precise Gateway-balance read would avoid redundant deposits — add if it matters.
   const atomic = usdcAtomic(topUpUsdc);
   const allowance = await publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "allowance", args: [account.address, GATEWAY_WALLET] });
   if (allowance < atomic) {

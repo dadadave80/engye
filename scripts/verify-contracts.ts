@@ -6,6 +6,7 @@
 //   - default codegen only — the verifier cannot express Venom (experimentalCodegen dropped)
 // Run: bun scripts/verify-contracts.ts
 import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 
 const BASE = "https://testnet.arcscan.app/api/v2/smart-contracts";
 const COMPILER = "v0.4.3+commit.bff19ea2";
@@ -40,14 +41,16 @@ for (const c of CONTRACTS) {
   };
   const tmp = `/tmp/verify-${c.name}.json`;
   writeFileSync(tmp, JSON.stringify(std));
-  // curl on purpose: Bun FormData multipart is rejected by this Blockscout instance
-  const proc = Bun.spawnSync([
-    "curl", "-s", "-X", "POST", `${BASE}/${address}/verification/via/vyper-standard-input`,
+  // multipart upload via curl (standard fetch+FormData also works — the historical verification
+  // failures were NOT the multipart, they were Venom bytecode the verifier couldn't match, fixed
+  // by shipping default-codegen; curl just keeps this script dependency-free of the Bun global).
+  const out = execFileSync("curl", [
+    "-s", "-X", "POST", `${BASE}/${address}/verification/via/vyper-standard-input`,
     "-F", `compiler_version=${COMPILER}`,
     "-F", "license_type=apache_2_0",
     "-F", `files[0]=@${tmp};type=application/json`,
-  ]);
-  console.log(`${c.name}: submitted — ${proc.stdout.toString().slice(0, 80)}`);
+  ], { encoding: "utf8" });
+  console.log(`${c.name}: submitted — ${out.slice(0, 80)}`);
   let ok = false;
   for (let i = 0; i < 12 && !ok; i++) {
     await new Promise((r) => setTimeout(r, 8000));
