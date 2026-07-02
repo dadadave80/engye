@@ -1,0 +1,24 @@
+name: demand-agent
+on:
+  schedule:
+    - cron: "*/5 * * * *" # GitHub delays these by minutes — jitter reads organic
+  workflow_dispatch:
+
+jobs:
+  buy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun agents/demand.ts --cycles 1
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          RPC: ${{ secrets.RPC }}
+          DEMAND_PRIVATE_KEY: ${{ secrets.DEMAND_PRIVATE_KEY }}
+          DEMAND_ADDRESS: ${{ vars.DEMAND_ADDRESS || '0xe0C04aA2AbC98e519C4a176b31c953D96ABa7D70' }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DAILY_DEMAND_BUDGET: "2.0"

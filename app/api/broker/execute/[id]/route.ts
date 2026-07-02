@@ -66,7 +66,8 @@ export async function POST(
     .insert({
       quote_id: id, provider_id: provider.id, match_key: matchKey, status: "pending",
       decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
-      price_usdc: quote.total_price_usdc, source: req.headers.get("x-engye-source") ?? "organic",
+      price_usdc: quote.total_price_usdc,
+      source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
     })
     .select().single();
   await supabaseAdmin.from("quotes").update({ status: "executed" }).eq("id", id);
