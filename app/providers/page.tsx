@@ -28,7 +28,7 @@ export default async function ProvidersPage() {
 
         <Card padding={0}>
           {providers.length === 0 ? (
-            <EmptyState title="No providers registered" hint="Register an x402 endpoint above — we probe it, pay one real call, and seed a reputation prior." />
+            <EmptyState title="No providers yet." description="Register an x402 endpoint above — we probe it, pay one real call, and seed a reputation prior." />
           ) : (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>

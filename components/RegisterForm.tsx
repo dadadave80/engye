@@ -1,11 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Card, Button } from "./ui/primitives";
-
-const field: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6 };
-const labelS: React.CSSProperties = { fontSize: 13, fontWeight: 500 };
-const inputS: React.CSSProperties = { padding: "8px 10px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--background)", color: "var(--foreground)", fontSize: 14, fontFamily: "var(--font-body)" };
-const hintS: React.CSSProperties = { fontSize: 12, color: "var(--muted-foreground)" };
+import { Card, Button, Input } from "./ui/primitives";
 
 export function RegisterForm() {
   const [form, setForm] = useState({ name: "", endpoint_url: "", price_usdc: "", wallet_address: "", capabilities: "" });
@@ -35,16 +30,16 @@ export function RegisterForm() {
   return (
     <Card stele padding={20}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        <div style={field}><label style={labelS}>Name</label><input style={inputS} placeholder="hermes-relay" value={form.name} onChange={set("name")} /></div>
-        <div style={field}><label style={labelS}>Endpoint URL</label><input style={{ ...inputS, fontFamily: "var(--font-mono)" }} placeholder="https://api.example.com/task" value={form.endpoint_url} onChange={set("endpoint_url")} /><span style={hintS}>Must answer 402 with payment requirements.</span></div>
-        <div style={field}><label style={labelS}>Price per task</label><input style={{ ...inputS, fontFamily: "var(--font-mono)" }} placeholder="0.05" value={form.price_usdc} onChange={set("price_usdc")} /><span style={hintS}>USDC</span></div>
-        <div style={field}><label style={labelS}>Wallet</label><input style={{ ...inputS, fontFamily: "var(--font-mono)" }} placeholder="0x…" value={form.wallet_address} onChange={set("wallet_address")} /></div>
-        <div style={{ ...field, gridColumn: "1 / -1" }}><label style={labelS}>Capabilities</label><input style={inputS} placeholder="summarization, question-answering" value={form.capabilities} onChange={set("capabilities")} /><span style={hintS}>Comma-separated.</span></div>
+        <Input label="Name" placeholder="hermes-relay" value={form.name} onChange={set("name")} />
+        <Input label="Endpoint URL" mono placeholder="https://api.example.com/task" hint="Must answer 402 with payment requirements." value={form.endpoint_url} onChange={set("endpoint_url")} />
+        <Input label="Price per task" mono placeholder="0.05" hint="USDC" value={form.price_usdc} onChange={set("price_usdc")} />
+        <Input label="Wallet" mono placeholder="0x…" value={form.wallet_address} onChange={set("wallet_address")}
+          error={state === "fail" ? message : undefined} />
+        <Input label="Capabilities" placeholder="summarization, question-answering" hint="Comma-separated." value={form.capabilities} onChange={set("capabilities")} style={{ gridColumn: "1 / -1" }} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <Button size="sm" onClick={submit} disabled={state === "probing"}>{state === "probing" ? "Probing…" : "Probe & register"}</Button>
         {state === "ok" && <span style={{ fontSize: 13, color: "var(--success)" }}>{message}</span>}
-        {state === "fail" && <span style={{ fontSize: 13, color: "var(--oxblood-badge)" }}>{message}</span>}
       </div>
     </Card>
   );

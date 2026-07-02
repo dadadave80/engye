@@ -24,7 +24,7 @@ export default async function CalibrationPage() {
         </div>
         <Card padding={24}>
           {withData.length === 0 ? (
-            <EmptyState title="Not enough settled matches yet" hint="Once matches settle across confidence buckets, the broker's calibration curve renders here — its stated confidence against the realized pass rate." />
+            <EmptyState title="Not enough settled matches yet." description="Once matches settle across confidence buckets, the broker's calibration curve renders here — its stated confidence against the realized pass rate." />
           ) : (
             <>
               <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label="Calibration chart">

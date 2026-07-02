@@ -50,7 +50,7 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
   }, []);
 
   if (rows.length === 0) {
-    return <EmptyState title="No matches yet" hint="The demand agent buys every few minutes. Watch this space — the first bonded match will appear here." />;
+    return <EmptyState title="The agora is quiet." description="The demand agent buys every few minutes — the first bonded match will appear here." />;
   }
 
   return (

@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { LiveFeed } from "@/components/LiveFeed";
 import { DecisionsRail } from "@/components/DecisionsRail";
+import { FlowPanel } from "@/components/FlowPanel";
 import { StatCard, Card } from "@/components/ui/primitives";
 import { getFeed, getTotals, getRecentDecisions } from "@/lib/queries";
 import { Check } from "lucide-react";
@@ -34,7 +35,10 @@ export default async function DashboardPage() {
               <span>Ledger reconciles — Σ payments + bonds − slashes = balances</span>
             </div>
           </Card>
-          <DecisionsRail decisions={decisions} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <DecisionsRail decisions={decisions} />
+            <FlowPanel totals={totals} />
+          </div>
         </div>
       </div>
     </AppShell>

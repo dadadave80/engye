@@ -47,6 +47,8 @@ export interface Totals {
   slashesCompensated: number;
   organic: number;
   demand: number;
+  openCount: number;
+  paidCount: number;
 }
 
 export async function getTotals(): Promise<Totals> {
@@ -61,6 +63,8 @@ export async function getTotals(): Promise<Totals> {
     slashesCompensated: rows.filter((r) => r.status === "failed_compensated").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
     organic: settled.filter((r) => r.source !== "demand_agent").length,
     demand: settled.filter((r) => r.source === "demand_agent").length,
+    openCount: rows.filter((r) => r.status === "pending" || r.status === "bonded").length,
+    paidCount: rows.filter((r) => ["paid", "delivered", "failed_compensated"].includes(r.status)).length,
   };
 }
 
