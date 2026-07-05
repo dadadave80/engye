@@ -74,7 +74,7 @@ export function PostTaskForm() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <Card padding={24}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="r-2col">
             <Input label="Task type" placeholder="question-answering" value={type} onChange={(e) => setType(e.target.value)} />
             <Input label="Max price (USDC)" mono placeholder="0.01" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
           </div>
@@ -96,7 +96,7 @@ export function PostTaskForm() {
         <Card stele padding={24}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Eyebrow>The bonded quote</Eyebrow>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+            <div className="r-stat-grid">
               <Stat label="Confidence" value={quote.confidence.toFixed(2)} />
               <Stat label="Bond staked" value={`${quote.bond_usdc.toFixed(3)} USDC`} tone="gold" />
               <Stat label="You pay" value={`${quote.total_price_usdc.toFixed(4)} USDC`} />

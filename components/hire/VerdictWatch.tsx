@@ -74,10 +74,10 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
   const progress = total > 0 ? Math.max(0, left) / total : 0;
   return (
     <div className="animate-in fade-in duration-300" style={shell}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Clock size={16} color="var(--ring)" aria-hidden="true" />
-        <span style={{ fontSize: 14, fontWeight: 500 }}>verdict in <span style={mono}>{fmt(left)}</span></span>
-        <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted-foreground)" }}>my validator rules publicly</span>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+        <Clock size={16} color="var(--ring)" aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 14, fontWeight: 500, flexShrink: 0 }}>verdict in <span style={mono}>{fmt(left)}</span></span>
+        <span className="r-hide-xs" style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted-foreground)" }}>my validator rules publicly</span>
       </div>
       <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden", marginTop: 12 }}>
         <div className="bar-fill" style={{ height: "100%", width: "100%", transformOrigin: "left center", transform: `scaleX(${progress})`, transition: "transform 1s linear", background: "var(--ring)" }} />

@@ -22,15 +22,15 @@ const keyTypeLabel = (t: number) => (["P256", "Passkey · WebAuthn", "Wallet · 
 interface KeyRow { expiry: number; keyType: number; isSuperAdmin: boolean; hash: `0x${string}`; publicKey: `0x${string}` }
 
 const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
-const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)" };
+const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)", flexWrap: "wrap" };
 const empty: React.CSSProperties = { textAlign: "center", color: "var(--muted-foreground)", fontSize: 13, padding: "20px 0" };
 
 function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16, marginTop: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{title}</span>
           {action}
         </div>
@@ -132,15 +132,15 @@ export function AccountPanel() {
     <Card padding={24}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {/* header actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <a href={FAUCET} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm">Add Funds</Button></a>
           <a href="https://docs.arc.network" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm" variant="outline">Help</Button></a>
           <Button size="sm" variant="outline" onClick={signOff} style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}>Sign Out</Button>
         </div>
 
         {/* Your account + QR */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div className="min-w-0" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <Eyebrow>Your account</Eyebrow>
             <button onClick={copy} style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: "var(--foreground)", padding: 0 }}>
               <span style={{ ...mono, fontSize: 15 }}>{trunc(address)}</span>

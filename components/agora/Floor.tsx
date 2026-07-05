@@ -25,9 +25,9 @@ const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantN
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <div className="min-w-0" style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
       <span style={{ fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted-foreground)" }}>{label}</span>
-      <span style={{ ...mono, fontSize: 14, color: tone || "var(--foreground)" }}>{value}</span>
+      <span style={{ ...mono, fontSize: 14, color: tone || "var(--foreground)", overflowWrap: "break-word" }}>{value}</span>
     </div>
   );
 }
@@ -63,7 +63,7 @@ function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
       <Card padding={16} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{
             fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em",
             color: "var(--accent)", border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "2px 8px",
@@ -78,7 +78,7 @@ function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
           </span>
         </div>
         <div style={{ fontSize: 13, color: "var(--muted-foreground)" }}>{m.provider}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
           <Metric label="Price" value={`${price} USDC`} />
           <Metric label="Bond" value={`${bond} USDC`} tone="var(--ring)" />
           <Metric label="ĉ" value={confidence} />
@@ -111,7 +111,7 @@ const VerdictRowView = memo(function VerdictRowView({ r, fresh }: { r: VerdictRo
       style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderBottom: "1px solid var(--border)" }}
     >
       <Badge status={r.status} />
-      <span style={{ fontSize: 14, flex: 1, textWrap: "pretty" }}>
+      <span className="min-w-0" style={{ fontSize: 14, flex: 1, textWrap: "pretty" }}>
         {r.provider} · {r.task} — {DRAMA[r.status]}
       </span>
       {href && (
@@ -203,7 +203,7 @@ export function Floor({ initialLive, initialFeed }: { initialLive: LiveMatch[]; 
             </span>
           </EmptyState>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+          <div className="r-card-grid">
             {live.map((m) => <LiveCard key={m.id} m={m} now={now} />)}
           </div>
         )}

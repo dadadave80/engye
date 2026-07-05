@@ -177,3 +177,49 @@ a { color: inherit; }
   font-family: var(--font-body); font-size: 14px; text-decoration: none;
 }
 .skip-link:focus { left: 8px; top: 8px; }
+
+/* ===== responsive layout layer (ultrawide → iPhone SE) =====
+   Inline styles can't hold media queries, so shared layout lives here as classes.
+   Symmetric grids collapse intrinsically via auto-fit + min(); asymmetric ones use a breakpoint. */
+
+/* never let a page scroll sideways; media never overflows its box */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, svg, video, canvas { max-width: 100%; }
+
+/* centered content column: fluid gutters, capped, but breathes wider on ultrawide */
+.container { width: 100%; max-width: 1280px; margin-inline: auto; box-sizing: border-box; padding-inline: clamp(16px, 4vw, 48px); }
+@media (min-width: 1920px) { .container { max-width: 1600px; } }
+
+/* fluid section rhythm — replaces fixed "112px 48px" (crushes to 56px on phones) */
+.section-pad { padding-block: clamp(56px, 9vw, 112px); padding-inline: clamp(20px, 5vw, 48px); box-sizing: border-box; }
+.page-gutter { padding-inline: clamp(16px, 4vw, 24px); }
+
+/* asymmetric hero: two columns on desktop → single column (art below/hidden) under 860px */
+.r-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(24px, 4vw, 48px); align-items: center; }
+@media (max-width: 860px) { .r-hero { grid-template-columns: 1fr; } .r-hero-art { justify-content: flex-start !important; } }
+@media (max-width: 520px) { .r-hero-art { display: none !important; } }
+
+/* asymmetric split (providers/two-col) → stack under 860px */
+.r-split { display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
+@media (max-width: 860px) { .r-split { grid-template-columns: 1fr; } }
+
+/* symmetric auto-collapsing grids — no breakpoint needed; min() forces 1 col when narrower than the min */
+.r-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: clamp(20px, 3vw, 32px); }
+.r-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; }
+.r-2col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
+
+/* footer → stack under 640px */
+.r-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; }
+@media (max-width: 640px) { .r-footer { grid-template-columns: 1fr; gap: 24px; } }
+
+/* app header nav: scrolls horizontally when it can't fit (keeps all items reachable on a phone) */
+.r-nav { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.r-nav::-webkit-scrollbar { display: none; }
+.r-nav > * { flex-shrink: 0; white-space: nowrap; }
+
+/* visibility helpers by width */
+@media (max-width: 520px) { .r-hide-xs { display: none !important; } }
+@media (max-width: 768px) { .r-hide-sm { display: none !important; } }
+
+/* prevent flex children from refusing to shrink (text truncation, no overflow) */
+.min-w-0 { min-width: 0; }

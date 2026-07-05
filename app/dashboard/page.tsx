@@ -16,27 +16,29 @@ export default async function DashboardPage() {
   return (
     <AppShell settled={totals.matchesSettled}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <div className="r-stat-grid">
           <StatCard label="Matches settled" value={totals.matchesSettled.toLocaleString()} caption={`${totals.organic} organic · ${totals.demand} demand-agent`} />
           <StatCard label="USDC settled" value={usd(totals.usdcSettled)} unit="USDC" />
           <StatCard label="Bonds at risk" value={usd(totals.bondsAtRisk)} unit="USDC" tone="gold" />
           <StatCard label="Slashes compensated" value={usd(totals.slashesCompensated)} unit="USDC" tone="oxblood" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, alignItems: "start" }}>
+        <div className="r-split" style={{ alignItems: "start" }}>
           <Card padding={0}>
-            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>Live match feed</span>
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--muted-foreground)" }}>realtime</span>
             </div>
             <LiveFeed initial={feed} />
-            <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--success)" }}>
+            <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--success)", flexWrap: "wrap" }}>
               <Check size={14} />
-              <span>Ledger reconciles — Σ payments + bonds − slashes = balances</span>
+              <span className="min-w-0">Ledger reconciles — Σ payments + bonds − slashes = balances</span>
             </div>
           </Card>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <DecisionsRail decisions={decisions} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+              <DecisionsRail decisions={decisions} />
+            </div>
             <FlowPanel totals={totals} />
           </div>
         </div>

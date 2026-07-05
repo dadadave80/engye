@@ -54,7 +54,7 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
   }
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead><tr>
           <th style={th}>Time</th><th style={th}>Task</th><th style={th}>Provider</th>

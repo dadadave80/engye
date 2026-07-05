@@ -51,7 +51,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
   if (output.error) {
     return (
       <div className={ENTER}>
-        <Card padding={16} style={{ maxWidth: 460 }}>
+        <Card padding={16} style={{ maxWidth: "min(460px, 100%)" }}>
           <span style={{ fontSize: 13, color: "var(--muted-foreground)" }}>{String(output.error)}</span>
         </Card>
       </div>
@@ -61,7 +61,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
   if (output.declined) {
     return (
       <div className={ENTER}>
-        <Card padding={18} style={{ borderColor: "color-mix(in oklab, var(--destructive) 45%, var(--border))", maxWidth: 460 }}>
+        <Card padding={18} style={{ borderColor: "color-mix(in oklab, var(--destructive) 45%, var(--border))", maxWidth: "min(460px, 100%)" }}>
           <Label text="Declined" color="var(--destructive)" icon={Scale} />
           <p style={{ margin: "12px 0 0", fontSize: 15, lineHeight: 1.5, color: "var(--foreground)", textWrap: "pretty" }}>
             {String(output.reason ?? "I won't bond this one — the spec is underspecified and I can't price my confidence honestly.")}
@@ -107,9 +107,9 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
         ];
     return (
       <div className={ENTER}>
-        <Card stele={bonded} padding={18} style={{ maxWidth: 460 }}>
+        <Card stele={bonded} padding={18} style={{ maxWidth: "min(460px, 100%)" }}>
           <Label text={bonded ? "Accepted · bonded" : "Accepted"} color={bonded ? "var(--ring)" : "var(--muted-foreground)"} icon={bonded ? Coins : undefined} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", margin: "12px 0 14px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 6, margin: "12px 0 14px" }}>
             <span style={{ fontSize: 15, fontWeight: 500 }}>Task</span>
             {bonded && <span style={{ ...mono, fontSize: 14, color: "var(--ring)" }}>{q.bond_usdc} USDC staked</span>}
           </div>
@@ -124,7 +124,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
             ))}
           </div>
           {result.deliverable !== undefined && (
-            <pre style={{ margin: "14px 0 0", padding: 12, background: "var(--muted)", borderRadius: "var(--radius)", fontSize: 12, maxHeight: 260, overflow: "auto", whiteSpace: "pre-wrap" }}>
+            <pre style={{ margin: "14px 0 0", padding: 12, background: "var(--muted)", borderRadius: "var(--radius)", fontSize: 12, maxHeight: 260, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
               {JSON.stringify(result.deliverable, null, 2)}
             </pre>
           )}
@@ -140,14 +140,14 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
 
   return (
     <div className={ENTER}>
-      <Card stele={bonded} padding={18} style={{ maxWidth: 460 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <Card stele={bonded} padding={18} style={{ maxWidth: "min(460px, 100%)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "4px 12px" }}>
           <Label
             text={bonded ? "Bonded quote" : "Best effort — no bond"}
             color={bonded ? "var(--ring)" : "var(--muted-foreground)"}
             icon={bonded ? Coins : undefined}
           />
-          <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>expires {new Date(q.expires_at).toLocaleTimeString()}</span>
+          <span style={{ fontSize: 11, color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>expires {new Date(q.expires_at).toLocaleTimeString()}</span>
         </div>
 
         {bonded && (

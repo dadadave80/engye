@@ -9,7 +9,7 @@ import { supabasePublic, txUrl } from "@/lib/supabase/public";
 import { VERDICT_WINDOW_SECONDS } from "@/lib/economics";
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
-const row: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, ...mono, fontSize: 14, padding: "8px 0", borderBottom: "1px solid var(--border)" };
+const row: CSSProperties = { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, ...mono, fontSize: 14, padding: "8px 0", borderBottom: "1px solid var(--border)" };
 const lastRow: CSSProperties = { ...row, borderBottom: "none" };
 const pre: CSSProperties = {
   ...mono, fontSize: 13, background: "var(--secondary)", border: "1px solid var(--border)",
@@ -133,16 +133,16 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 760, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div className="min-w-0" style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
           <Eyebrow>Match receipt</Eyebrow>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, margin: 0 }}>{task?.type ?? "task"}</h1>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, margin: 0, overflowWrap: "anywhere" }}>{task?.type ?? "task"}</h1>
         </div>
         <Badge status={badgeStatus(m.status)} />
       </div>
 
       <Card stele padding={20}>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Provider</span><span>{m.providers?.name ?? "—"}</span></div>
+          <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Provider</span><span style={{ overflowWrap: "anywhere", textAlign: "right" }}>{m.providers?.name ?? "—"}</span></div>
           <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Confidence ĉ</span><span>{m.quotes?.confidence != null ? m.quotes.confidence.toFixed(2) : "—"}</span></div>
           <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Bond</span><span>{m.bond_usdc != null ? Number(m.bond_usdc).toFixed(4) : "—"} USDC</span></div>
           <div style={lastRow}><span style={{ color: "var(--muted-foreground)" }}>Price</span><span>{m.price_usdc != null ? Number(m.price_usdc).toFixed(4) : "—"} USDC</span></div>
@@ -264,15 +264,15 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
                   </span>
                   {!last && <span style={{ position: "absolute", left: 7, top: 18, bottom: -6, width: 2, background: "var(--border)" }} />}
                 </div>
-                <div style={{ paddingBottom: last ? 0 : 18, flex: 1, marginTop: -1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
+                <div style={{ paddingBottom: last ? 0 : 18, flex: 1, marginTop: -1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                    <span className="min-w-0" style={{ fontSize: 14, fontWeight: 500, color: done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
                     {url && (
-                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" aria-label={`View ${s.label} on Arcscan`} style={{ color: "var(--link)", display: "inline-flex" }}>
+                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" aria-label={`View ${s.label} on Arcscan`} style={{ color: "var(--link)", display: "inline-flex", flexShrink: 0 }}>
                         <ExternalLink size={13} aria-hidden="true" />
                       </a>
                     )}
-                    {s.amount && <span style={{ ...mono, fontSize: 12.5, color: s.tone ?? "var(--muted-foreground)", marginLeft: "auto" }}>{s.amount}</span>}
+                    {s.amount && <span style={{ ...mono, fontSize: 12.5, color: s.tone ?? "var(--muted-foreground)", marginLeft: "auto", flexShrink: 0 }}>{s.amount}</span>}
                   </div>
                 </div>
               </div>
@@ -282,7 +282,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: 12, color: "var(--muted-foreground)" }}>
-        <span style={mono} title={m.match_key}>{m.match_key}</span>
+        <span className="min-w-0" style={{ ...mono, wordBreak: "break-all", overflowWrap: "anywhere", minWidth: 0 }} title={m.match_key}>{m.match_key}</span>
         <span>bonded by ENGYE</span>
       </div>
     </div>

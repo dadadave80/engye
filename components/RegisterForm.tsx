@@ -29,7 +29,7 @@ export function RegisterForm() {
 
   return (
     <Card stele padding={20}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div className="r-2col" style={{ marginBottom: 16 }}>
         <Input label="Name" placeholder="hermes-relay" value={form.name} onChange={set("name")} />
         <Input label="Endpoint URL" mono placeholder="https://api.example.com/task" hint="Must answer 402 with payment requirements." value={form.endpoint_url} onChange={set("endpoint_url")} />
         <Input label="Price per task" mono placeholder="0.05" hint="USDC" value={form.price_usdc} onChange={set("price_usdc")} />
@@ -37,7 +37,7 @@ export function RegisterForm() {
           error={state === "fail" ? message : undefined} />
         <Input label="Capabilities" placeholder="summarization, question-answering" hint="Comma-separated." value={form.capabilities} onChange={set("capabilities")} style={{ gridColumn: "1 / -1" }} />
       </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
         <Button size="sm" onClick={submit} disabled={state === "probing"}>{state === "probing" ? "Probing…" : "Probe & Register"}</Button>
         {state === "ok" && <span style={{ fontSize: 13, color: "var(--success)" }}>{message}</span>}
       </div>

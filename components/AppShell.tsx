@@ -26,13 +26,13 @@ export function AppShell({ settled, children }: { settled?: number; children: Re
   return (
     <div className="dark" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", colorScheme: "dark" }}>
       <a href="#main-content" className="skip-link">Skip to content</a>
-      <header style={{ height: 56, display: "flex", alignItems: "center", gap: 32, padding: "0 24px", maxWidth: 1280, margin: "0 auto", boxSizing: "border-box" }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
+      <header className="container" style={{ minHeight: 56, display: "flex", alignItems: "center", gap: "clamp(10px, 3vw, 32px)" }}>
+        <Link href="/" className="focus-ring" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit", flexShrink: 0 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/assets/obol-mark.svg" width={24} height={24} alt="" />
-          <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 14, letterSpacing: "0.12em" }}>ENGYE</span>
+          <span className="r-hide-xs" style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 14, letterSpacing: "0.12em" }}>ENGYE</span>
         </Link>
-        <nav style={{ display: "flex", gap: 4, flex: 1 }}>
+        <nav className="r-nav" style={{ flex: 1 }}>
           {NAV.map((item) => {
             const active = pathname === item.href;
             return (
@@ -46,13 +46,13 @@ export function AppShell({ settled, children }: { settled?: number; children: Re
             );
           })}
         </nav>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <LivePill count={settled ?? count} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <span className="r-hide-sm"><LivePill count={settled ?? count} /></span>
           <ConnectButton />
         </div>
       </header>
       <div className="meander-hairline" />
-      <main id="main-content" tabIndex={-1} style={{ maxWidth: 1280, margin: "0 auto", padding: 24, boxSizing: "border-box", outline: "none" }}>{children}</main>
+      <main id="main-content" tabIndex={-1} className="container" style={{ paddingBlock: 24, outline: "none" }}>{children}</main>
     </div>
   );
 }

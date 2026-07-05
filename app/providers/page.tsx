@@ -30,7 +30,7 @@ export default async function ProvidersPage() {
           {providers.length === 0 ? (
             <EmptyState title="No providers yet." description="Register an x402 endpoint above — we probe it, pay one real call, and seed a reputation prior." />
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr>
                   <th style={th}>#</th><th style={th}>Provider</th><th style={th}>ĉ</th><th style={th}>Trials</th>

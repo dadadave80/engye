@@ -39,7 +39,7 @@ export default async function StatusPage() {
           <span style={{ fontSize: 20, fontWeight: 600 }}>Status &amp; reconciliation</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <div className="r-stat-grid">
           <StatCard label="Broker treasury" value={usd(treasury)} unit="USDC" tone={matchingActive ? "laurel" : "oxblood"} caption={matchingActive ? "matching active" : "circuit breaker tripped"} />
           <StatCard label="Gas (native)" value={usd(gas)} unit="USDC" />
           <StatCard label="Refund vault float" value={usd(vaultFloat)} unit="USDC" tone="gold" />
@@ -55,12 +55,14 @@ export default async function StatusPage() {
 
         <Card padding={0}>
           <div style={{ padding: "14px 16px", borderBottom: "1px solid var(--border)", fontSize: 14, fontWeight: 600 }}>Deployed contracts (all verified on Arcscan)</div>
-          {CONTRACTS.map(([name, addr]) => (
-            <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 14 }}>{name}</span>
-              {addr ? <AddressChip address={addr} href={`${ARCSCAN}/address/${addr}?tab=contract`} /> : <span style={{ color: "var(--muted-foreground)" }}>—</span>}
-            </div>
-          ))}
+          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+            {CONTRACTS.map(([name, addr]) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: "1px solid var(--border)", flexWrap: "wrap", gap: 8 }}>
+                <span className="min-w-0" style={{ fontSize: 14 }}>{name}</span>
+                {addr ? <AddressChip address={addr} href={`${ARCSCAN}/address/${addr}?tab=contract`} /> : <span style={{ color: "var(--muted-foreground)" }}>—</span>}
+              </div>
+            ))}
+          </div>
         </Card>
 
         <ClaimCard />

@@ -101,11 +101,11 @@ export function StakePanel() {
         {pending.amount > 0n && (
           <div style={{ ...row, color: "var(--gold-lifted)" }}><span>Unstaking</span><span>{fromAtomic(pending.amount).toFixed(4)} · {canWithdraw ? "ready" : `${Math.ceil(cooldownLeft / 60)}m cooldown`}</span></div>
         )}
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-          <div style={{ flex: 1 }}><Input label="Amount (USDC)" mono placeholder="1.0" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <div className="min-w-0" style={{ flex: 1, minWidth: 160 }}><Input label="Amount (USDC)" mono placeholder="1.0" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
           <Button disabled={busy !== null || !amount} onClick={stake}>{busy === "Stake" ? "Staking…" : "Stake"}</Button>
         </div>
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount} onClick={requestUnstake}>
             Request Unstake
           </Button>
