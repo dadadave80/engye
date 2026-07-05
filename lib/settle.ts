@@ -34,6 +34,31 @@ async function idempotent(label: string, fn: () => Promise<string>): Promise<str
   }
 }
 
+/** Best-effort ERC-8004 + reputation tail. Money-free and idempotent — each step is guarded by its
+ *  own tx column, so it is safe to re-run for a terminal match whose tail failed the first time.
+ *  Never throws (logs and moves on); NEVER touches escrow/vault/stake, so it can't affect settlement. */
+async function runReputationTail(
+  m: Record<string, any>, provider: Record<string, any>, v: { pass: boolean; score: number }, matchKey: Hex, matchId: string,
+): Promise<void> {
+  if (!supabaseAdmin) return;
+  try {
+    if (m.validation_request_tx && !m.validation_response_tx) {
+      const responseTx = await respondValidation({
+        matchKey, score: v.score, deliverableHash: contentHash(JSON.stringify(m.deliverable ?? null)), passed: v.pass,
+      });
+      await supabaseAdmin.from("matches").update({ validation_response_tx: responseTx }).eq("id", matchId);
+    }
+    if (provider?.agent_id && !m.feedback_tx) {
+      const feedbackTx = await giveFeedback({ providerAgentId: BigInt(provider.agent_id), score: v.score, passed: v.pass, matchKey });
+      await supabaseAdmin.from("matches").update({ feedback_tx: feedbackTx }).eq("id", matchId);
+      await applyOutcome({
+        providerId: provider.id, matchId, pass: v.pass, score: v.score,
+        latencyMs: Date.now() - Date.parse(m.created_at), earnedUsdc: Number(provider.price_usdc), onchainTx: feedbackTx,
+      });
+    }
+  } catch (e) { console.warn(`[settle ${matchId}] reputation tail:`, e instanceof Error ? e.message : e); }
+}
+
 export async function settleMatch(matchId: string): Promise<"settled" | "skipped" | "retry"> {
   if (!supabaseAdmin) return "skipped";
 
@@ -106,23 +131,9 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
     if (txs.stake_slash_tx) upd.stake_slash_tx = txs.stake_slash_tx;
     await supabaseAdmin.from("matches").update(upd).eq("id", matchId);
 
-    // 4. REPUTATION TAIL — best-effort; failures logged, never fatal, not retried against money.
-    try {
-      if (m.validation_request_tx && !m.validation_response_tx) {
-        const responseTx = await respondValidation({
-          matchKey, score: v.score, deliverableHash: contentHash(JSON.stringify(m.deliverable ?? null)), passed: v.pass,
-        });
-        await supabaseAdmin.from("matches").update({ validation_response_tx: responseTx }).eq("id", matchId);
-      }
-      if (provider.agent_id && !m.feedback_tx) {
-        const feedbackTx = await giveFeedback({ providerAgentId: BigInt(provider.agent_id), score: v.score, passed: v.pass, matchKey });
-        await supabaseAdmin.from("matches").update({ feedback_tx: feedbackTx }).eq("id", matchId);
-        await applyOutcome({
-          providerId: provider.id, matchId, pass: v.pass, score: v.score,
-          latencyMs: Date.now() - startedAt, earnedUsdc: Number(provider.price_usdc), onchainTx: feedbackTx,
-        });
-      }
-    } catch (e) { console.warn(`[settle ${matchId}] reputation tail:`, e instanceof Error ? e.message : e); }
+    // 4. REPUTATION TAIL — best-effort, money-free, idempotent. If it fails here it is retried later
+    //    by retryTails() (the sweep) so a Groq/RPC hiccup can't leave a permanent hole in the graph.
+    await runReputationTail(m, provider, { pass: v.pass, score: v.score }, matchKey, matchId);
 
     return "settled";
   } catch (e) {
@@ -148,5 +159,29 @@ export async function sweepDueMatches(limit = 10): Promise<number> {
     .order("created_at", { ascending: true }).limit(limit);
   let done = 0;
   for (const row of due ?? []) if ((await settleMatch(row.id)) === "settled") done++;
+  return done;
+}
+
+/** Re-run the money-free reputation tail for TERMINAL matches whose ERC-8004 validation response
+ *  never posted (a Groq/RPC hiccup after settlement) — keeps the on-chain reputation graph complete.
+ *  Guarded to matches that filed a validation request but have no response tx; runReputationTail also
+ *  completes any missing feedback for those. Money is already settled and never touched here. */
+export async function retryTails(limit = 10): Promise<number> {
+  if (!supabaseAdmin) return 0;
+  const { data: rows } = await supabaseAdmin
+    .from("matches")
+    .select("id,match_key,created_at,deliverable,validation_request_tx,validation_response_tx,feedback_tx,providers(id,agent_id,price_usdc),validations(pass,score)")
+    .in("status", ["delivered", "failed_compensated"])
+    .not("validation_request_tx", "is", null)
+    .is("validation_response_tx", null)
+    .order("settled_at", { ascending: true }).limit(limit);
+  let done = 0;
+  for (const row of rows ?? []) {
+    const m = row as Record<string, any>;
+    const v = m.validations?.[0];
+    if (!v) continue; // no stored verdict → nothing to post
+    await runReputationTail(m, m.providers, { pass: v.pass, score: v.score }, m.match_key as Hex, m.id);
+    done++;
+  }
   return done;
 }
