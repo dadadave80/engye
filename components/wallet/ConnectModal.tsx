@@ -24,6 +24,10 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<"main" | "switch">("main");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  // Circle username rule: 5–50 chars, alphanumeric + _@.:+- (an email fits; it becomes the passkey's
+  // identity in Google Password Manager / the authenticator).
+  const emailOk = /^[A-Za-z0-9_@.:+-]{5,50}$/.test(email.trim());
 
   const active = current ?? accounts[0] ?? null;
   const configured = circleConfigured();
@@ -40,7 +44,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
       setErr(cause && cause !== msg ? `${msg} (${cause})` : msg);
     } finally { setBusy(false); }
   }
-  const signUp = () => run(signUpPasskey);
+  const signUp = () => { if (emailOk) run(() => signUpPasskey(email.trim())); else setErr("Enter your email to create a passkey."); };
 
   function continueWith() {
     if (active) { switchTo(active.address); onClose(); } // known device → no re-prompt
@@ -88,20 +92,31 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {configured ? (
-              <>
-                <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={continueWith}>
-                  <ScanFace size={16} /> {busy ? "Waiting for passkey…" : active ? "Continue with Passkey" : "Sign in with Passkey"}
-                </button>
-
-                {/* Using · Switch · Sign up */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--muted-foreground)" }}>
-                  <span style={mono}>{active ? `Using ${trunc(active.address)}` : "New here?"}</span>
-                  <span style={{ display: "inline-flex", gap: 12 }}>
-                    {accounts.length > 1 && <button style={link} onClick={() => setView("switch")}>Switch</button>}
-                    <button style={link} disabled={busy} onClick={signUp}>Create Passkey</button>
-                  </span>
-                </div>
-              </>
+              active ? (
+                <>
+                  <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={continueWith}>
+                    <ScanFace size={16} /> {busy ? "Waiting for passkey…" : "Continue with Passkey"}
+                  </button>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--muted-foreground)" }}>
+                    <span style={mono}>Using {trunc(active.address)}</span>
+                    <span style={{ display: "inline-flex", gap: 12 }}>
+                      {accounts.length > 1 && <button style={link} onClick={() => setView("switch")}>Switch</button>}
+                      <button style={link} disabled={busy} onClick={() => run(loginPasskey)}>Add another</button>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input type="email" inputMode="email" autoComplete="email" placeholder="you@email.com"
+                    value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email"
+                    onKeyDown={(e) => { if (e.key === "Enter") signUp(); }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 14, fontFamily: "var(--font-mono)", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none" }} />
+                  <button style={{ ...primaryBtn, opacity: busy || !emailOk ? 0.7 : 1 }} disabled={busy || !emailOk} onClick={signUp}>
+                    <ScanFace size={16} /> {busy ? "Waiting for passkey…" : "Create Passkey"}
+                  </button>
+                  <button style={{ ...link, alignSelf: "center" }} disabled={busy} onClick={() => run(loginPasskey)}>Already have a passkey? Sign in →</button>
+                </>
+              )
             ) : (
               <div style={{ padding: "10px 12px", borderRadius: "var(--radius)", border: "1px dashed var(--border)", fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
                 Passkey sign-in is being configured. Use a browser wallet below in the meantime.
