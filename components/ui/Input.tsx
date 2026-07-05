@@ -1,5 +1,5 @@
 "use client";
-import { useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 
 /** Form input with label, hint, and directive error copy. Focus ring gold. */
 export function Input({
@@ -9,19 +9,17 @@ export function Input({
   value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   type?: string; disabled?: boolean; style?: CSSProperties;
 }) {
-  const [focus, setFocus] = useState(false);
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 6, fontFamily: "var(--font-body)", ...style }}>
       {label && <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>}
       <input
         type={type} placeholder={placeholder} value={value} onChange={onChange} disabled={disabled}
-        onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+        className="focus-ring"
         style={{
           fontFamily: mono ? "var(--font-mono)" : "var(--font-body)", fontSize: 14, padding: "10px 12px", minHeight: 22,
           background: "var(--card)", color: "var(--foreground)",
           border: `1px solid ${error ? "var(--destructive)" : "var(--input)"}`,
           borderRadius: "var(--radius)", outline: "none",
-          boxShadow: focus ? "0 0 0 2px var(--background), 0 0 0 4px var(--ring)" : "none",
           transition: "border-color var(--dur) var(--ease)", opacity: disabled ? 0.55 : 1,
         }}
       />

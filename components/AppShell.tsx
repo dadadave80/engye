@@ -24,7 +24,8 @@ export function AppShell({ settled, children }: { settled?: number; children: Re
     fetch("/api/status").then((r) => r.json()).then((s) => setCount(s?.totals?.matchesSettled ?? 0)).catch(() => {});
   }, [settled]);
   return (
-    <div className="dark" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)" }}>
+    <div className="dark" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", colorScheme: "dark" }}>
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <header style={{ height: 56, display: "flex", alignItems: "center", gap: 32, padding: "0 24px", maxWidth: 1280, margin: "0 auto", boxSizing: "border-box" }}>
         <Link href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -35,7 +36,7 @@ export function AppShell({ settled, children }: { settled?: number; children: Re
           {NAV.map((item) => {
             const active = pathname === item.href;
             return (
-              <Link key={item.href} href={item.href} style={{
+              <Link key={item.href} href={item.href} className="focus-ring" aria-current={active ? "page" : undefined} style={{
                 padding: "8px 12px", borderRadius: "var(--radius)", textDecoration: "none", fontSize: 14,
                 fontWeight: active ? 600 : 400,
                 color: active ? "var(--foreground)" : "var(--muted-foreground)",
@@ -51,7 +52,7 @@ export function AppShell({ settled, children }: { settled?: number; children: Re
         </div>
       </header>
       <div className="meander-hairline" />
-      <main style={{ maxWidth: 1280, margin: "0 auto", padding: 24, boxSizing: "border-box" }}>{children}</main>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 1280, margin: "0 auto", padding: 24, boxSizing: "border-box", outline: "none" }}>{children}</main>
     </div>
   );
 }

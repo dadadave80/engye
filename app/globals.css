@@ -161,3 +161,19 @@ body {
 }
 
 a { color: inherit; }
+
+/* Keyboard focus ring — gold, only on :focus-visible (never on mouse click). Elements keep
+   `outline: none` inline; this adds the ring for keyboard/AT users. */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+}
+
+/* Skip-to-content link — off-screen until focused, then pinned top-left. */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  padding: 10px 16px; background: var(--card); color: var(--foreground);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--font-body); font-size: 14px; text-decoration: none;
+}
+.skip-link:focus { left: 8px; top: 8px; }

@@ -18,7 +18,6 @@ export function Button({
   onClick?: () => void; style?: CSSProperties; type?: "button" | "submit";
 }) {
   const [hover, setHover] = useState(false);
-  const [focus, setFocus] = useState(false);
   const variants: Record<Variant, CSSProperties> = {
     primary: { background: hover ? "color-mix(in oklab, var(--primary) 88%, var(--background))" : "var(--primary)", color: "var(--primary-foreground)", border: "1px solid transparent" },
     secondary: { background: hover ? "color-mix(in oklab, var(--secondary) 92%, var(--foreground))" : "var(--secondary)", color: "var(--secondary-foreground)", border: "1px solid transparent" },
@@ -30,15 +29,14 @@ export function Button({
   return (
     <button
       type={type} disabled={disabled} onClick={onClick}
+      className="focus-ring"
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
         fontFamily: "var(--font-body)", fontWeight: 500, lineHeight: 1,
         borderRadius: "var(--radius)", cursor: disabled ? "not-allowed" : "pointer",
         transition: "background-color var(--dur) var(--ease), color var(--dur) var(--ease)",
         opacity: disabled ? 0.55 : 1, outline: "none",
-        boxShadow: focus ? "0 0 0 2px var(--background), 0 0 0 4px var(--ring)" : "none",
         ...SIZES[size], ...variants[variant], ...style,
       }}
     >

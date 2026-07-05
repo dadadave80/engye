@@ -100,7 +100,7 @@ function Composer({ value, onChange, onSubmit, disabled }: { value: string; onCh
         padding: "8px 8px 8px 14px",
       }}>
       <textarea
-        ref={ref} value={value} rows={1} placeholder="e.g. summarize https://… into 3 bullets" disabled={disabled}
+        ref={ref} value={value} rows={1} className="focus-ring" placeholder="e.g. summarize https://… into 3 bullets" disabled={disabled}
         aria-label="Message ENGYE"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}

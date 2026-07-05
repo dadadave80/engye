@@ -80,7 +80,7 @@ export function PostTaskForm() {
           </div>
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 500 }}>Task spec</span>
-            <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={3}
+            <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={3} className="focus-ring"
               placeholder="What is the capital of Australia, and why is it not Sydney?"
               style={{ fontFamily: "var(--font-body)", fontSize: 14, padding: "10px 12px", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none", resize: "vertical" }} />
           </label>
