@@ -68,9 +68,14 @@ export async function sendCalls(credential: StoredCredential, calls: { to: Addre
   try {
     userOpHash = await bundler.sendUserOperation({ account, calls, paymaster: true });
   } catch (e) {
-    // AA33 = paymaster validation failed → almost always a missing/inactive Gas Station policy for Arc
     const msg = e instanceof Error ? e.message : String(e);
-    if (/AA33|paymaster/i.test(msg)) throw new Error("Gasless sponsorship is unavailable — the Circle Gas Station policy for Arc Testnet may not be active. " + msg);
+    // check balance FIRST — an "exceeds balance" revert also mentions the paymaster in the wrapped
+    // userOp error, so a naive AA33/paymaster match would mislabel an unfunded account.
+    if (/exceeds balance|insufficient (funds|balance)|transfer amount exceeds/i.test(msg))
+      throw new Error("Your passkey account doesn't have enough USDC for this task yet — the first-task sponsor may still be landing; try again in a moment. " + msg);
+    // AA33 = paymaster validation failed → almost always a missing/inactive Gas Station policy for Arc
+    if (/\bAA33\b|paymaster (validation|deposit|balance)/i.test(msg))
+      throw new Error("Gasless sponsorship is unavailable — the Circle Gas Station policy for Arc Testnet may not be active. " + msg);
     throw e;
   }
   const { receipt } = await bundler.waitForUserOperationReceipt({ hash: userOpHash });

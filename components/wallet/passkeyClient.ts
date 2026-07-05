@@ -45,6 +45,11 @@ export async function signAndRelay(session: PasskeySession, calls: Call[]): Prom
 /** Pay an open quote from the passkey MSCA. Discovers payTo+amount from the execute 402, transfers
  *  USDC via a gasless userOp, then binds the tx to the quote server-side (execute honors that binding). */
 export async function payForQuote(session: PasskeySession, quoteId: string): Promise<Hex> {
+  // self-heal: ensure the account is registered (execute's payer allow-list) + funded (0.25 USDC
+  // sponsor) BEFORE paying. Idempotent — a no-op if signup already provisioned. This is what makes
+  // a first payment work even if provision failed at signup (e.g. the historical window-503), and
+  // it awaits the sponsor tx so the balance has landed before the transfer userOp simulates.
+  await registerAccount(session.credential, session.address);
   const probe = await fetch(`/api/broker/execute/${quoteId}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
   if (probe.status !== 402) throw new Error(`expected 402 requirements, got ${probe.status}`);
   const reqs = JSON.parse(atob(probe.headers.get("payment-required")!)).accepts[0];

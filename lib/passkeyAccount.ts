@@ -28,8 +28,12 @@ function relayer() {
 export async function registerPasskeyAccount(opts: { credentialId: string; account: Address; publicKey: Hex }): Promise<Address> {
   if (!supabaseAdmin) throw new Error("persistence unavailable");
   const address = opts.account.toLowerCase();
-  const { data: existing } = await supabaseAdmin.from("passkey_accounts").select("account").eq("credential_id", opts.credentialId).maybeSingle();
-  if (existing?.account) return existing.account as Address;
+  // idempotent by ACCOUNT (the MSCA is deterministic from the credential, so account↔credential is
+  // 1:1) — so calling this again for an already-provisioned account (e.g. the payForQuote self-heal)
+  // never re-inserts or re-sponsors, even if a different credential_id string is passed. limit(1)
+  // (not maybeSingle) tolerates any legacy duplicate rows without throwing.
+  const { data: existingRows } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", address).limit(1);
+  if (existingRows && existingRows.length > 0) return opts.account;
 
   // CLAIM before spending: the credential_id PK makes a concurrent duplicate lose here, pre-sponsor.
   const { error: claimErr } = await supabaseAdmin.from("passkey_accounts").insert({
