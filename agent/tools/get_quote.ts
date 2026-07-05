@@ -31,6 +31,19 @@ export default defineTool({
         return { error: `could not fetch that URL: ${e instanceof Error ? e.message : String(e)}` };
       }
     }
-    return quoteTask({ type: task_type, spec: fullSpec, max_price_usdc }, null);
+    try {
+      return await quoteTask({ type: task_type, spec: fullSpec, max_price_usdc }, null);
+    } catch (e) {
+      // quoteTask throws when the broker LLM fails (Groq rate-limit / schema-validation). Returning
+      // a graceful {error} — not re-throwing — keeps this a successful tool result so the agent
+      // relays ONE clear message instead of retry-looping get_quote (which burns TPM and hangs the
+      // typing indicator). QuoteCard renders output.error.
+      const msg = e instanceof Error ? e.message : String(e);
+      return {
+        error: /rate.?limit|TPM|\b429\b|try again in/i.test(msg)
+          ? "the broker is briefly rate-limited — give it a few seconds and ask again"
+          : "the broker couldn't price that one just now — try rephrasing, or send a smaller task",
+      };
+    }
   },
 });
