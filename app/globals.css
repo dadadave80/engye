@@ -149,9 +149,15 @@ body {
 @keyframes engye-typing { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
 .typing-dot { animation: engye-typing 1.2s var(--ease) infinite; }
 
+/* progress / countdown fills — animate transform:scaleX (compositor-friendly), never width.
+   Component sets `transform: scaleX(<0..1>)` + its own `transition: transform …` inline; this
+   class carries the origin and kills the transition under reduced-motion. */
+.bar-fill { transform-origin: left center; }
+
 @media (prefers-reduced-motion: reduce) {
   .engye-row-in, [style*="engye-live-pulse"],
   .animate-in, .animate-out, .flash-pass, .flash-slash, .typing-dot { animation: none !important; }
+  .bar-fill { transition: none !important; }
 }
 
 a { color: inherit; }

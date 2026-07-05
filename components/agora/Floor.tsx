@@ -73,7 +73,7 @@ function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
             color: settling ? "var(--muted-foreground)" : "var(--ring)",
             background: "color-mix(in oklab, var(--gold) 12%, transparent)", borderRadius: 999, padding: "3px 9px",
           }}>
-            <Clock size={12} color="currentColor" />
+            <Clock size={12} color="currentColor" aria-hidden="true" />
             {settling ? "settling" : fmtClock(dueMs)}
           </span>
         </div>
@@ -91,7 +91,7 @@ function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
           }}>{dp}</div>
         )}
         <Link href={`/m/${m.match_key}`} style={{ color: "var(--link)", textDecoration: "none", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 4 }}>
-          match page <ArrowRight size={13} />
+          match page <ArrowRight size={13} aria-hidden="true" />
         </Link>
       </Card>
     </div>
@@ -115,7 +115,7 @@ const VerdictRowView = memo(function VerdictRowView({ r, fresh }: { r: VerdictRo
         {r.provider} · {r.task} — {DRAMA[r.status]}
       </span>
       {href && (
-        <a href={href} target="_blank" rel="noreferrer" title="View on Arcscan" style={{ color: "var(--link)", display: "inline-flex", flexShrink: 0 }}>
+        <a href={href} target="_blank" rel="noreferrer" title="View on Arcscan" aria-label="View on Arcscan" style={{ color: "var(--link)", display: "inline-flex", flexShrink: 0 }}>
           <ExternalLink size={14} />
         </a>
       )}

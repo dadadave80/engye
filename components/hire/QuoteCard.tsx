@@ -20,7 +20,7 @@ const ENTER = "animate-in fade-in slide-in-from-bottom-2 duration-300";
 function Label({ text, color, icon: Icon }: { text: string; color: string; icon?: LucideIcon }) {
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.22em", color }}>
-      {Icon ? <Icon size={13} strokeWidth={2} /> : <span style={{ width: 20, height: 1, background: "currentColor" }} />}
+      {Icon ? <Icon size={13} strokeWidth={2} aria-hidden="true" /> : <span style={{ width: 20, height: 1, background: "currentColor" }} />}
       {text}
     </div>
   );
@@ -117,7 +117,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
             {steps.map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}>
                 <span style={{ width: 18, height: 18, borderRadius: 999, display: "grid", placeItems: "center", background: s.done ? "var(--success)" : "transparent", border: s.done ? "none" : "2px solid var(--border)", flexShrink: 0 }}>
-                  {s.done && <Check size={11} color="var(--success-foreground)" strokeWidth={3} />}
+                  {s.done && <Check size={11} color="var(--success-foreground)" strokeWidth={3} aria-hidden="true" />}
                 </span>
                 <span style={{ color: s.done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
               </div>
@@ -164,13 +164,13 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
 
         {bonded && (
           <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden", margin: "12px 0" }}>
-            <div style={{ height: "100%", width: pct(q.confidence), background: "var(--accent)", transition: "width var(--dur) var(--ease)" }} />
+            <div className="bar-fill" style={{ height: "100%", width: "100%", transformOrigin: "left center", transform: `scaleX(${q.confidence})`, transition: "transform var(--dur) var(--ease)", background: "var(--accent)" }} />
           </div>
         )}
 
         {wallet.connected ? (
           <Button onClick={accept} disabled={busy} style={{ width: "100%", marginTop: bonded ? 4 : 14 }}>
-            {passkey && <KeyRound size={15} />}
+            {passkey && <KeyRound size={15} aria-hidden="true" />}
             {busy ? "Paying…" : `Accept · ${q.total_price_usdc} USDC${passkey ? " · passkey" : ""}`}
           </Button>
         ) : (

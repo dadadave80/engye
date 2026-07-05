@@ -101,6 +101,7 @@ function Composer({ value, onChange, onSubmit, disabled }: { value: string; onCh
       }}>
       <textarea
         ref={ref} value={value} rows={1} placeholder="e.g. summarize https://… into 3 bullets" disabled={disabled}
+        aria-label="Message ENGYE"
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
         style={{
@@ -109,8 +110,8 @@ function Composer({ value, onChange, onSubmit, disabled }: { value: string; onCh
           resize: "none", maxHeight: 160, minWidth: 0, padding: "6px 0",
         }}
       />
-      <Button type="submit" size="sm" disabled={!value.trim() || disabled} style={{ padding: "8px 12px", minHeight: 38 }}>
-        <ArrowUp size={16} />
+      <Button type="submit" size="sm" disabled={!value.trim() || disabled} aria-label="Send" style={{ padding: "8px 12px", minHeight: 38 }}>
+        <ArrowUp size={16} aria-hidden="true" />
       </Button>
     </form>
   );
@@ -148,7 +149,7 @@ export function HireChat() {
     <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
       <Eyebrow>Hire ENGYE — quotes are free, every job is bonded</Eyebrow>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div aria-live="polite" aria-atomic="false" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {empty && (
           <>
             <AssistantTurn>

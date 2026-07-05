@@ -64,7 +64,7 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
             </span>
           ))}
           <a href={`/m/${matchKey}`} style={{ color: "var(--link)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4, marginLeft: "auto" }}>
-            match page <ArrowRight size={13} />
+            match page <ArrowRight size={13} aria-hidden="true" />
           </a>
         </div>
       </div>
@@ -75,12 +75,12 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
   return (
     <div className="animate-in fade-in duration-300" style={shell}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Clock size={16} color="var(--ring)" />
+        <Clock size={16} color="var(--ring)" aria-hidden="true" />
         <span style={{ fontSize: 14, fontWeight: 500 }}>verdict in <span style={mono}>{fmt(left)}</span></span>
         <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted-foreground)" }}>my validator rules publicly</span>
       </div>
       <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden", marginTop: 12 }}>
-        <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--ring)", transition: "width 1s linear" }} />
+        <div className="bar-fill" style={{ height: "100%", width: "100%", transformOrigin: "left center", transform: `scaleX(${progress})`, transition: "transform 1s linear", background: "var(--ring)" }} />
       </div>
       <div style={{ marginTop: 8, textAlign: "right" }}>
         <a href={`/m/${matchKey}`} style={{ fontSize: 11, color: "var(--link)" }}>/m/{matchKey.slice(0, 10)}…{left === 0 ? " (any second now)" : ""}</a>

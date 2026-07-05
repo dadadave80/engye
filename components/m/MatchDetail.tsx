@@ -135,7 +135,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <Eyebrow>Match receipt</Eyebrow>
-          <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600 }}>{task?.type ?? "task"}</div>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, margin: 0 }}>{task?.type ?? "task"}</h1>
         </div>
         <Badge status={badgeStatus(m.status)} />
       </div>
@@ -177,10 +177,11 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
           : undefined}
       >
         <Eyebrow style={label}>Verdict</Eyebrow>
+        <div aria-live="polite">
         {!terminal ? (
           <div className="animate-in fade-in duration-300" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Clock size={16} color="var(--ring)" />
+              <Clock size={16} color="var(--ring)" aria-hidden="true" />
               {msLeft != null ? (
                 msLeft > 0 ? (
                   <span style={{ fontSize: 14, fontWeight: 500 }}>verdict in <span style={mono}>{fmtClock(msLeft)}</span></span>
@@ -194,7 +195,13 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
             </div>
             {msLeft != null && (
               <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--ring)", transition: "width 1s linear" }} />
+                <div
+                  className="bar-fill"
+                  style={{
+                    height: "100%", width: "100%", background: "var(--ring)",
+                    transformOrigin: "left center", transform: `scaleX(${progress})`, transition: "transform 1s linear",
+                  }}
+                />
               </div>
             )}
             {overdue && (
@@ -234,6 +241,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
         ) : (
           <div style={{ fontSize: 14, color: "var(--muted-foreground)" }}>No validation recorded.</div>
         )}
+        </div>
       </Card>
 
       <Card padding={20}>
@@ -252,7 +260,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
                     background: done ? (s.tone ?? "var(--foreground)") : "transparent",
                     border: done ? "none" : "2px solid var(--border)",
                   }}>
-                    {done && <Check size={10} color="var(--background)" strokeWidth={3} />}
+                    {done && <Check size={10} color="var(--background)" strokeWidth={3} aria-hidden="true" />}
                   </span>
                   {!last && <span style={{ position: "absolute", left: 7, top: 18, bottom: -6, width: 2, background: "var(--border)" }} />}
                 </div>
@@ -260,8 +268,8 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 14, fontWeight: 500, color: done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
                     {url && (
-                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" style={{ color: "var(--link)", display: "inline-flex" }}>
-                        <ExternalLink size={13} />
+                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" aria-label={`View ${s.label} on Arcscan`} style={{ color: "var(--link)", display: "inline-flex" }}>
+                        <ExternalLink size={13} aria-hidden="true" />
                       </a>
                     )}
                     {s.amount && <span style={{ ...mono, fontSize: 12.5, color: s.tone ?? "var(--muted-foreground)", marginLeft: "auto" }}>{s.amount}</span>}

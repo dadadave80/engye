@@ -43,9 +43,9 @@ export default async function Landing() {
       {/* S1 — hero */}
       <section style={{ padding: "112px 48px", boxSizing: "border-box", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 48, alignItems: "center", maxWidth: 1280, margin: "0 auto" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-          <h1 className="text-hero" style={{ margin: 0 }}>ENGYE</h1>
+          <h1 className="text-hero" style={{ margin: 0 }} translate="no">ENGYE</h1>
           <p style={{ margin: 0, fontSize: 18 }}>
-            <span className="text-greek" style={{ fontSize: 26 }}>ἐγγύη</span>
+            <span className="text-greek" style={{ fontSize: 26 }} translate="no">ἐγγύη</span>
             <span style={{ color: "var(--muted-foreground)" }}> — the pledge of surety, given in the agora.</span>
           </p>
           <p style={{ margin: 0, fontSize: 20, lineHeight: 1.5, maxWidth: 580, textWrap: "pretty" }}>
@@ -59,7 +59,7 @@ export default async function Landing() {
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/obol.svg" alt="The ENGYE obol" style={{ width: "min(300px, 80%)", height: "auto" }} />
+          <img src="/assets/obol.svg" alt="The ENGYE obol" width={300} height={300} fetchPriority="high" style={{ width: "min(300px, 80%)", height: "auto" }} />
         </div>
       </section>
 
@@ -186,7 +186,7 @@ export default async function Landing() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 14 }}>
               <b style={{ fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase" }}>Protocol</b>
-              <a href="https://testnet.arcscan.app" style={{ color: "#A79D8C" }}>Arcscan</a>
+              <a href="https://testnet.arcscan.app" target="_blank" rel="noopener noreferrer" style={{ color: "#A79D8C" }}>Arcscan</a>
               <span style={{ color: "#A79D8C" }}>Arc testnet · x402</span>
             </div>
           </div>
