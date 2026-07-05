@@ -2,6 +2,7 @@
 import { assertPublicHttpsUrl } from "./ssrf";
 
 const CAP = 20_000;
+const BYTE_CEIL = 2_000_000; // hard read ceiling — a public URL is still a public input; don't buffer an unbounded body into memory
 
 export async function fetchPageText(url: string): Promise<string> {
   await assertPublicHttpsUrl(url);
@@ -13,7 +14,19 @@ export async function fetchPageText(url: string): Promise<string> {
   });
   if (res.status >= 300 && res.status < 400) throw new Error("redirects not allowed");
   if (!res.ok) throw new Error(`fetch failed: HTTP ${res.status}`);
-  const raw = (await res.text()).slice(0, CAP * 10);
+  // stream with a byte ceiling so a huge (still SSRF-legal) page can't OOM the function before truncation
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("empty response body");
+  const decoder = new TextDecoder();
+  let raw = "";
+  let bytes = 0;
+  while (bytes < BYTE_CEIL && raw.length < CAP * 10) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.length;
+    raw += decoder.decode(value, { stream: true });
+  }
+  await reader.cancel().catch(() => {});
   const text = raw
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
