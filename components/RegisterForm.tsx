@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Card, Button, Input } from "./ui/primitives";
+import { Card, Button, Input, Eyebrow } from "./ui/primitives";
 
 export function RegisterForm() {
   const [form, setForm] = useState({ name: "", endpoint_url: "", price_usdc: "", wallet_address: "", capabilities: "", agent_id: "" });
@@ -30,6 +30,12 @@ export function RegisterForm() {
 
   return (
     <Card stele padding={20}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+        <Eyebrow>Register a provider</Eyebrow>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", maxWidth: 620, lineHeight: 1.5 }}>
+          Any x402 endpoint earns here. ENGYE probes it (expects a well-formed 402), pays one real call, and the validator scores you into a starting reputation — then the broker routes you paid demand.
+        </p>
+      </div>
       <div className="r-2col" style={{ marginBottom: 16 }}>
         <Input label="Name" placeholder="hermes-relay" value={form.name} onChange={set("name")} />
         <Input label="Endpoint URL" mono placeholder="https://api.example.com/task" hint="Must answer 402 with payment requirements." value={form.endpoint_url} onChange={set("endpoint_url")} />
