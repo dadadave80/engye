@@ -1,7 +1,7 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { quoteTask } from "../../lib/broker";
-import { rateLimit } from "../../lib/ratelimit";
+import { rateLimit } from "../../lib/ratelimit-core";
 
 export default defineTool({
   description:

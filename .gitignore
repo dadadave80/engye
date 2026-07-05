@@ -19,6 +19,7 @@
 
 # eve
 /.eve/
+/.output/
 
 # production
 /build
