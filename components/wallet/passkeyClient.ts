@@ -16,20 +16,28 @@ export async function signUpPasskey(label?: string): Promise<PasskeySession> {
   if (typeof window === "undefined") throw new Error("passkey requires a browser");
   // 1. create the WebAuthn passkey (Porto/ox handles the credential + P-256 key).
   //    Porto doesn't set authenticatorAttachment, so mobile Chrome offers NFC/USB security keys
-  //    instead of the device's own biometrics — inject `platform` via Porto's createFn hook so
-  //    the passkey is created with Face ID / Touch ID / Android screen lock.
-  const key = await Key.createWebAuthnP256({
-    label: label || "ENGYE",
-    rpId: rpId(),
-    createFn: (options) => {
-      const pk = options?.publicKey;
-      const patched = pk
-        ? { ...options, publicKey: { ...pk, authenticatorSelection: { ...pk.authenticatorSelection, authenticatorAttachment: "platform" } } }
-        : options;
-      // ox vendors its own WebAuthn types; runtime shape is the DOM's CredentialCreationOptions
-      return navigator.credentials.create(patched as CredentialCreationOptions);
-    },
-  });
+  //    instead of the device's own biometrics. Prefer `platform` (Face ID / Touch ID / Android
+  //    screen lock) — but only when the device REPORTS a platform authenticator (UVPAA); forcing
+  //    it on devices without one makes creation fail outright. If the forced path still fails,
+  //    retry unrestricted so the user at least gets the picker.
+  const createFn = (attachment?: "platform") => (options?: { publicKey?: unknown }) => {
+    const pk = options?.publicKey as PublicKeyCredentialCreationOptions | undefined;
+    const patched = attachment && pk
+      ? { ...options, publicKey: { ...pk, authenticatorSelection: { ...pk.authenticatorSelection, authenticatorAttachment: attachment } } }
+      : options;
+    // ox vendors its own WebAuthn types; runtime shape is the DOM's CredentialCreationOptions
+    return navigator.credentials.create(patched as CredentialCreationOptions);
+  };
+  const platformOk = await window.PublicKeyCredential
+    ?.isUserVerifyingPlatformAuthenticatorAvailable?.().catch(() => false) ?? false;
+  const params = { label: label || "ENGYE", rpId: rpId() };
+  let key: Awaited<ReturnType<typeof Key.createWebAuthnP256>>;
+  try {
+    key = await Key.createWebAuthnP256({ ...params, createFn: createFn(platformOk ? "platform" : undefined) });
+  } catch (e) {
+    if (!platformOk) throw e; // wasn't the attachment's fault — surface the real failure
+    key = await Key.createWebAuthnP256({ ...params, createFn: createFn(undefined) });
+  }
   const serialized = Key.serialize(key); // { expiry, isSuperAdmin, keyType, publicKey } — contract form
   const cred = (key.privateKey as { credential: { id: string; publicKey: PublicKey.PublicKey } }).credential;
   const credentialPublicKey = PublicKey.toHex(cred.publicKey);
