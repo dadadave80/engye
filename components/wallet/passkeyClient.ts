@@ -14,8 +14,22 @@ const rpId = () => (typeof window !== "undefined" ? window.location.hostname : "
 /** Sign up: create a NEW WebAuthn passkey (Face ID / Touch ID) and provision its Ithaca account. */
 export async function signUpPasskey(label?: string): Promise<PasskeySession> {
   if (typeof window === "undefined") throw new Error("passkey requires a browser");
-  // 1. create the WebAuthn passkey (Porto/ox handles the credential + P-256 key)
-  const key = await Key.createWebAuthnP256({ label: label || "ENGYE", rpId: rpId() });
+  // 1. create the WebAuthn passkey (Porto/ox handles the credential + P-256 key).
+  //    Porto doesn't set authenticatorAttachment, so mobile Chrome offers NFC/USB security keys
+  //    instead of the device's own biometrics — inject `platform` via Porto's createFn hook so
+  //    the passkey is created with Face ID / Touch ID / Android screen lock.
+  const key = await Key.createWebAuthnP256({
+    label: label || "ENGYE",
+    rpId: rpId(),
+    createFn: (options) => {
+      const pk = options?.publicKey;
+      const patched = pk
+        ? { ...options, publicKey: { ...pk, authenticatorSelection: { ...pk.authenticatorSelection, authenticatorAttachment: "platform" } } }
+        : options;
+      // ox vendors its own WebAuthn types; runtime shape is the DOM's CredentialCreationOptions
+      return navigator.credentials.create(patched as CredentialCreationOptions);
+    },
+  });
   const serialized = Key.serialize(key); // { expiry, isSuperAdmin, keyType, publicKey } — contract form
   const cred = (key.privateKey as { credential: { id: string; publicKey: PublicKey.PublicKey } }).credential;
   const credentialPublicKey = PublicKey.toHex(cred.publicKey);
