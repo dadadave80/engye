@@ -54,12 +54,20 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
   const startedAt = Date.parse(m.created_at);
 
   try {
-    // 1. VERDICT — once. Re-runs reuse the stored row; the LLM is never re-asked after money moved.
-    let { data: v } = await supabaseAdmin.from("validations").select("pass,score,reasons,model").eq("match_id", matchId).maybeSingle();
+    // 1. VERDICT — exactly once, ever. The unique index on validations(match_id) (migration 0005)
+    // is the real backstop: if a concurrent settler (a live after() racing a sweep past the lease)
+    // also computes a verdict, only one INSERT wins; the loser's unique-violation is swallowed and
+    // BOTH re-read the single canonical row, so the LLM verdict can never be re-derived after money
+    // moves. (A bare maybeSingle() on 2 rows returns null+error and would silently re-validate forever.)
+    const sel = await supabaseAdmin.from("validations").select("pass,score,reasons,model").eq("match_id", matchId).maybeSingle();
+    if (sel.error) throw new Error(`validation read failed: ${sel.error.message}`);
+    let v = sel.data;
     if (!v) {
       const fresh = await validateDeliverable(quote.task.spec, quote.task.quality_bar, m.deliverable, matchId);
-      await supabaseAdmin.from("validations").insert({ match_id: matchId, pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model });
-      v = { pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model };
+      const ins = await supabaseAdmin.from("validations").insert({ match_id: matchId, pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model });
+      if (ins.error && !/duplicate key|already exists|unique|23505/i.test(ins.error.message)) throw new Error(`validation persist failed: ${ins.error.message}`);
+      const reread = await supabaseAdmin.from("validations").select("pass,score,reasons,model").eq("match_id", matchId).maybeSingle();
+      v = reread.data ?? { pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model };
     }
 
     // 2. MONEY — driven by on-chain state, not DB flags. Only bonded matches have on-chain steps.
@@ -82,12 +90,16 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
     }
 
     // 3. TERMINAL STATUS — before the reputation tail, so a tail crash can't re-run money steps.
+    // Write ONLY tx hashes this attempt actually produced; never fall back to our stale snapshot
+    // (m.settle_tx etc.), or a redundant racer that produced no new tx would null a hash the real
+    // settler just wrote. Omitted columns are left untouched.
     const status = !bonded ? "delivered" : v.pass ? "delivered" : "failed_compensated";
-    await supabaseAdmin.from("matches").update({
-      status, settled_at: new Date().toISOString(), latency_ms: Date.now() - startedAt,
-      settle_tx: txs.settle_tx ?? txs.slash_tx ?? m.settle_tx, refund_tx: txs.refund_tx ?? m.refund_tx,
-      stake_slash_tx: txs.stake_slash_tx ?? m.stake_slash_tx,
-    }).eq("id", matchId);
+    const upd: Record<string, unknown> = { status, settled_at: new Date().toISOString(), latency_ms: Date.now() - startedAt };
+    const settleTx = txs.settle_tx ?? txs.slash_tx;
+    if (settleTx) upd.settle_tx = settleTx;
+    if (txs.refund_tx) upd.refund_tx = txs.refund_tx;
+    if (txs.stake_slash_tx) upd.stake_slash_tx = txs.stake_slash_tx;
+    await supabaseAdmin.from("matches").update(upd).eq("id", matchId);
 
     // 4. REPUTATION TAIL — best-effort; failures logged, never fatal, not retried against money.
     try {
@@ -119,10 +131,13 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
 export async function sweepDueMatches(limit = 10): Promise<number> {
   if (!supabaseAdmin) return 0;
   const staleBefore = new Date(Date.now() - LEASE_MS).toISOString();
+  const now = new Date().toISOString();
+  // verdict_due_at gates only the window-based branches; a bonded 'error' (crash BEFORE delivery, so
+  // verdict_due_at is still NULL) must be reachable — NULL < now is never true, so it can't sit under
+  // a top-level .lt() or it would be silently excluded from remediation.
   const { data: due } = await supabaseAdmin
     .from("matches").select("id")
-    .lt("verdict_due_at", new Date().toISOString())
-    .or(`status.in.(awaiting_verdict,settle_retry),and(status.eq.validating,validating_at.lt.${staleBefore}),and(status.eq.error,bond_tx.not.is.null)`)
+    .or(`and(verdict_due_at.lt.${now},status.in.(awaiting_verdict,settle_retry)),and(verdict_due_at.lt.${now},status.eq.validating,validating_at.lt.${staleBefore}),and(status.eq.error,bond_tx.not.is.null)`)
     .order("verdict_due_at", { ascending: true }).limit(limit);
   let done = 0;
   for (const row of due ?? []) if ((await settleMatch(row.id)) === "settled") done++;
