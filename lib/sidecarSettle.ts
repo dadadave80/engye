@@ -22,14 +22,29 @@ export type SettlementJob = z.infer<typeof jobSchema>;
 const toSeconds = (t: number | string): number => (typeof t === "number" ? t : Date.parse(t) / 1000);
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 
-/** Find + validate a settlement job inside a task spec (fenced ```json first, then outermost {…}). */
+/** Every balanced {…} substring, left to right (prose braces like "{a, b}" just fail to parse). */
+function balancedBraceSpans(s: string): string[] {
+  const spans: string[] = [];
+  for (let i = s.indexOf("{"); i >= 0; i = s.indexOf("{", i + 1)) {
+    let depth = 0;
+    for (let j = i; j < s.length; j++) {
+      if (s[j] === "{") depth++;
+      else if (s[j] === "}" && --depth === 0) {
+        spans.push(s.slice(i, j + 1));
+        i = j; // skip past this span; outer loop continues after it
+        break;
+      }
+    }
+  }
+  return spans;
+}
+
+/** Find + validate a settlement job inside a task spec (fenced ```json first, then any balanced {…}). */
 export function extractSettlementJob(spec: string): SettlementJob | null {
   const candidates: string[] = [];
   const fence = /```(?:json)?\s*([\s\S]*?)```/g;
   for (let m = fence.exec(spec); m; m = fence.exec(spec)) candidates.push(m[1]);
-  const first = spec.indexOf("{");
-  const last = spec.lastIndexOf("}");
-  if (first >= 0 && last > first) candidates.push(spec.slice(first, last + 1));
+  candidates.push(...balancedBraceSpans(spec));
   for (const c of candidates) {
     try {
       const parsed = jobSchema.safeParse(JSON.parse(c));

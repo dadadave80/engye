@@ -14,8 +14,19 @@ async function handler(req: NextRequest): Promise<NextResponse> {
   if (job) {
     return NextResponse.json({ provider: "obol-sidecar-settle", answer: JSON.stringify(computeSettlement(job)) });
   }
-  const deliverable = await workTask(task, "answer");
-  return NextResponse.json({ provider: "obol-sidecar-settle", ...deliverable });
+  // Fallback (registry probe, non-settlement asks). Money has already settled by the time this
+  // handler runs, so NEVER 500 — a weak answer is validated/failed downstream (honest market
+  // behavior); a 500 strands the match in "error" after payment.
+  try {
+    const deliverable = await workTask(task, "answer");
+    return NextResponse.json({ provider: "obol-sidecar-settle", ...deliverable });
+  } catch (e) {
+    console.error("[sidecar/settle] fallback failed:", e instanceof Error ? e.message : String(e));
+    return NextResponse.json({
+      provider: "obol-sidecar-settle",
+      answer: "unable to complete this task — no valid settlement event log found in the spec, and the general worker is unavailable",
+    });
+  }
 }
 
 export const POST = protectRoute(

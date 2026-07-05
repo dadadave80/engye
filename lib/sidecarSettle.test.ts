@@ -84,4 +84,11 @@ describe("extractSettlementJob", () => {
   test("absent → null (the registry probe path)", () => {
     expect(extractSettlementJob("Registry probe: what is 17 + 25? Reply with the number and one short sentence.")).toBeNull();
   });
+  test("prose braces before the JSON don't poison extraction (prod regression)", () => {
+    // the hire-chat chip's exact shape: a {field, list} mention in prose, then the real job
+    const spec = `Compute the stream session settlement statement from this event log. Return JSON {per_viewer, total_seconds, total_usdc, recipients}: {"rate_usdc_per_second":0.0001,"events":[{"viewer":"alice","event":"joined","t":0},{"viewer":"alice","event":"parted","t":340}]}`;
+    const jobFound = extractSettlementJob(spec);
+    expect(jobFound).not.toBeNull();
+    expect(computeSettlement(jobFound!).total_seconds).toBe(340);
+  });
 });
