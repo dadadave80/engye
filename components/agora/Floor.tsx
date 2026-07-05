@@ -173,6 +173,13 @@ export function Floor({ initialLive, initialFeed }: { initialLive: LiveMatch[]; 
           .single();
         if (!data) return;
         const d = data as Record<string, any>;
+        // the agora is the bonded market — never surface unbonded (best-effort) matches, and drop
+        // any that somehow slipped in (their "bond released" copy would be wrong).
+        if (!(Number(d.bond_usdc) > 0)) {
+          setLive((prev) => prev.filter((r) => r.id !== d.id));
+          setFeed((prev) => prev.filter((r) => r.id !== d.id));
+          return;
+        }
         if (LIVE_STATUSES.has(d.status)) {
           // route to the live grid
           setLive((prev) => [shapeLive(d), ...prev.filter((r) => r.id !== d.id)]);

@@ -23,11 +23,12 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
       const { data } = await sb.from("matches").select("status,settle_tx,refund_tx,stake_slash_tx").eq("match_key", matchKey).single();
       if (data && ["delivered", "failed_compensated"].includes(data.status)) setRow(data);
     };
-    void check();
+    // subscribe FIRST, then check once the channel is live — otherwise a verdict landing in the gap
+    // between an early check() and the subscription going live would be missed (stuck countdown).
     const ch = sb.channel(`verdict-${matchKey}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `match_key=eq.${matchKey}` },
         (p) => { const m = p.new as Record<string, any>; if (["delivered", "failed_compensated"].includes(m.status)) setRow(m); })
-      .subscribe();
+      .subscribe((status) => { if (status === "SUBSCRIBED") void check(); });
     return () => { sb.removeChannel(ch); };
   }, [matchKey]);
 

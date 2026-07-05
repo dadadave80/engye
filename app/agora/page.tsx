@@ -32,13 +32,17 @@ function shapeVerdict(d: Record<string, any>): VerdictRow | null {
 
 export default async function AgoraPage() {
   const sb = supabasePublic();
+  // the agora is the BONDED market — only matches with a bond on the line (unbonded best-effort
+  // tasks have bond_usdc 0 and no bond_tx, so "bond released" copy would be wrong for them).
   const { data: liveRows } = await sb
     .from("matches").select(LIVE_SELECT)
     .in("status", ["awaiting_verdict", "validating", "settle_retry"])
+    .gt("bond_usdc", 0)
     .order("verdict_due_at", { ascending: true });
   const { data: feedRows } = await sb
     .from("matches").select(VERDICT_SELECT)
     .in("status", ["delivered", "failed_compensated"])
+    .gt("bond_usdc", 0)
     .order("settled_at", { ascending: false })
     .limit(15);
   const totals = await getTotals().catch(() => null);
