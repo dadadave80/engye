@@ -95,13 +95,25 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               </span>
             </div>
 
-            {/* browser wallet (EOA) — a full first-class option: fund it and pay/stake directly */}
+            {/* browser wallet (EOA) — a full first-class option: fund it and pay/stake directly.
+                Mobile browsers have no injected provider (no extensions) — show the real path
+                (the wallet app's in-app browser) instead of a silently-dead button. */}
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              <button onClick={() => { connect({ connector: injected() }); onClose(); }}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser Wallet</span>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>injected wallet <ChevronRight size={14} /></span>
-              </button>
+              {typeof window !== "undefined" && (window as { ethereum?: unknown }).ethereum ? (
+                <button onClick={() => { connect({ connector: injected() }); onClose(); }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser Wallet</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>injected wallet <ChevronRight size={14} /></span>
+                </button>
+              ) : (
+                <div style={{ padding: "10px 12px", borderRadius: "var(--radius)", border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--foreground)" }}><Wallet size={16} /> Browser Wallet</span>
+                  <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5 }}>
+                    No wallet found in this browser. On mobile, open <span style={mono}>engye.vercel.app</span> inside your wallet
+                    app&apos;s browser (e.g. MetaMask → menu → Browser) — or use a passkey above; first tasks are sponsored.
+                  </p>
+                </div>
+              )}
               <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer"
                 style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none", lineHeight: 1.4 }}>
                 New to Arc? Fund your wallet with testnet USDC — <span style={{ color: "var(--link)" }}>Circle Faucet</span> <ExternalLink size={11} /> <span>(pick Arc Testnet)</span>
