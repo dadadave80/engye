@@ -3,8 +3,10 @@
 // Countdown while the verdict is pending; realtime flip when settle() lands; a permissionless
 // "settle now" poke once the verdict window is >60s overdue (anyone may call /api/settle).
 import { useEffect, useState, type CSSProperties } from "react";
+import { Check, Clock, ExternalLink } from "lucide-react";
 import { Card, Badge, Eyebrow, Button } from "@/components/ui/primitives";
 import { supabasePublic, txUrl } from "@/lib/supabase/public";
+import { VERDICT_WINDOW_SECONDS } from "@/lib/economics";
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 const row: CSSProperties = { display: "flex", justifyContent: "space-between", gap: 12, ...mono, fontSize: 14, padding: "8px 0", borderBottom: "1px solid var(--border)" };
@@ -63,16 +65,28 @@ function fmtClock(ms: number): string {
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
-const TX_ROWS: Array<[string, keyof MatchRow]> = [
-  ["Bond", "bond_tx"],
-  ["Validation request", "validation_request_tx"],
-  ["Provider paid", "pay_tx"],
-  ["Validation response", "validation_response_tx"],
-  ["Settle", "settle_tx"],
-  ["Refund", "refund_tx"],
-  ["Stake slash", "stake_slash_tx"],
-  ["Feedback", "feedback_tx"],
-];
+const fmtUsdc = (n: number | null): string | undefined => (n != null ? `${n.toFixed(4)} USDC` : undefined);
+
+// The on-chain stepper (design: TxTimeline) — one step per real tx column already on the row.
+// `tone` colors the filled node + amount for money-moving steps whose direction depends on the
+// verdict (Settle releases OR slashes the bond; Refund only ever fires on the fail path).
+type TxStep = { label: string; tx: string | null; amount?: string; tone?: string };
+
+function txSteps(m: MatchRow, passed: boolean | null): TxStep[] {
+  const bondAmount = fmtUsdc(m.bond_usdc != null ? Number(m.bond_usdc) : null);
+  const priceAmount = fmtUsdc(m.price_usdc != null ? Number(m.price_usdc) : null);
+  const settleTone = passed == null ? undefined : passed ? "var(--laurel)" : "var(--oxblood)";
+  return [
+    { label: "Bond", tx: m.bond_tx, amount: bondAmount },
+    { label: "Validation request", tx: m.validation_request_tx },
+    { label: "Provider paid", tx: m.pay_tx, amount: priceAmount },
+    { label: "Validation response", tx: m.validation_response_tx },
+    { label: "Settle", tx: m.settle_tx, amount: bondAmount, tone: settleTone },
+    { label: "Refund", tx: m.refund_tx, amount: priceAmount, tone: "var(--oxblood)" },
+    { label: "Stake slash", tx: m.stake_slash_tx },
+    { label: "Feedback", tx: m.feedback_tx },
+  ];
+}
 
 export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey: string }) {
   const [m, setM] = useState<MatchRow>(initial);
@@ -110,6 +124,11 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
   const dueAtMs = m.verdict_due_at ? new Date(m.verdict_due_at).getTime() : null;
   const msLeft = dueAtMs != null ? dueAtMs - now : null;
   const overdue = msLeft != null && msLeft < -60_000;
+  const progress = msLeft != null ? Math.min(1, Math.max(0, msLeft / (VERDICT_WINDOW_SECONDS * 1000))) : 0;
+  // ground truth for "which way did the money move" — tied to m.status (mirrors the Badge), not the
+  // raw validation.pass bool, so an unbonded best-effort delivery (always "delivered") never renders
+  // the slashed copy just because its validator happened to fail it.
+  const passed = terminal ? m.status !== "failed_compensated" : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 760, margin: "0 auto" }}>
@@ -121,7 +140,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
         <Badge status={badgeStatus(m.status)} />
       </div>
 
-      <Card padding={20}>
+      <Card stele padding={20}>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Provider</span><span>{m.providers?.name ?? "—"}</span></div>
           <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Confidence ĉ</span><span>{m.quotes?.confidence != null ? m.quotes.confidence.toFixed(2) : "—"}</span></div>
@@ -151,18 +170,32 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
         </Card>
       )}
 
-      <Card padding={20}>
+      <Card
+        stele padding={20}
+        style={terminal && passed != null
+          ? { borderColor: `color-mix(in oklab, ${passed ? "var(--laurel)" : "var(--oxblood)"} 40%, var(--border))` }
+          : undefined}
+      >
         <Eyebrow style={label}>Verdict</Eyebrow>
         {!terminal ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-            {msLeft != null ? (
-              <div style={{ fontSize: 14, color: "var(--muted-foreground)" }}>
-                {msLeft > 0
-                  ? <>Verdict due in <span style={{ ...mono, color: "var(--foreground)" }}>{fmtClock(msLeft)}</span></>
-                  : <>Verdict overdue by <span style={{ ...mono, color: "var(--gold-lifted)" }}>{fmtClock(-msLeft)}</span></>}
+          <div className="animate-in fade-in duration-300" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Clock size={16} color="var(--ring)" />
+              {msLeft != null ? (
+                msLeft > 0 ? (
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>verdict in <span style={mono}>{fmtClock(msLeft)}</span></span>
+                ) : (
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>verdict overdue by <span style={{ ...mono, color: "var(--gold-lifted)" }}>{fmtClock(-msLeft)}</span></span>
+                )
+              ) : (
+                <span style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Awaiting delivery…</span>
+              )}
+              <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted-foreground)" }}>the validator rules publicly</span>
+            </div>
+            {msLeft != null && (
+              <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${progress * 100}%`, background: "var(--ring)", transition: "width 1s linear" }} />
               </div>
-            ) : (
-              <div style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Awaiting delivery…</div>
             )}
             {overdue && (
               <Button
@@ -174,17 +207,26 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
             )}
           </div>
         ) : validation ? (
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={row}>
-              <span style={{ color: "var(--muted-foreground)" }}>Result</span>
-              <span>{validation.pass ? "PASS" : "FAIL"}{validation.score != null ? ` · score ${validation.score}` : ""}</span>
+          <div className="animate-in fade-in zoom-in-95 duration-300" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Badge status={badgeStatus(m.status)} />
+              <span style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginLeft: "auto" }}>
+                ruled by <span style={mono}>{validation.model ?? "—"}</span>
+                {validation.score != null && <> · score <span style={mono}>{validation.score}</span></>}
+              </span>
             </div>
-            <div style={validation.reasons != null ? row : lastRow}>
-              <span style={{ color: "var(--muted-foreground)" }}>Validator model</span>
-              <span>{validation.model ?? "—"}</span>
-            </div>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
+              {passed
+                ? "Bond released — the broker kept its stake. The work passed the spec."
+                : <>Slashed — you were paid{" "}
+                  <span style={{ ...mono, color: "var(--destructive)" }}>
+                    {m.price_usdc != null && m.bond_usdc != null ? (Number(m.price_usdc) + Number(m.bond_usdc)).toFixed(4) : "—"} USDC
+                  </span>{" "}
+                  (price + bond), plus a cut of the provider&apos;s stake.
+                </>}
+            </p>
             {validation.reasons != null && (
-              <pre style={{ ...pre, marginTop: 10 }}>
+              <pre style={pre}>
                 {typeof validation.reasons === "string" ? validation.reasons : JSON.stringify(validation.reasons, null, 2)}
               </pre>
             )}
@@ -196,21 +238,35 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
 
       <Card padding={20}>
         <Eyebrow style={label}>On-chain timeline</Eyebrow>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {TX_ROWS.map(([txLabel, key], i) => {
-            const hash = m[key] as string | null;
-            const url = txUrl(hash);
-            const style = i === TX_ROWS.length - 1 ? lastRow : row;
+        <div>
+          {txSteps(m, passed).map((s, i, arr) => {
+            const last = i === arr.length - 1;
+            const done = !!s.tx;
+            const url = txUrl(s.tx);
             return (
-              <div key={key} style={style}>
-                <span style={{ color: "var(--muted-foreground)" }}>{txLabel}</span>
-                {url ? (
-                  <a href={url} target="_blank" rel="noreferrer" style={{ color: "var(--link)" }}>
-                    {hash!.slice(0, 10)}…{hash!.slice(-6)}
-                  </a>
-                ) : (
-                  <span style={{ color: "var(--muted-foreground)" }}>—</span>
-                )}
+              <div key={s.label} style={{ display: "flex", gap: 12 }}>
+                <div style={{ position: "relative", width: 16, flexShrink: 0 }}>
+                  <span style={{
+                    position: "relative", zIndex: 1, display: "grid", placeItems: "center",
+                    width: 16, height: 16, borderRadius: 999,
+                    background: done ? (s.tone ?? "var(--foreground)") : "transparent",
+                    border: done ? "none" : "2px solid var(--border)",
+                  }}>
+                    {done && <Check size={10} color="var(--background)" strokeWidth={3} />}
+                  </span>
+                  {!last && <span style={{ position: "absolute", left: 7, top: 18, bottom: -6, width: 2, background: "var(--border)" }} />}
+                </div>
+                <div style={{ paddingBottom: last ? 0 : 18, flex: 1, marginTop: -1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
+                    {url && (
+                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" style={{ color: "var(--link)", display: "inline-flex" }}>
+                        <ExternalLink size={13} />
+                      </a>
+                    )}
+                    {s.amount && <span style={{ ...mono, fontSize: 12.5, color: s.tone ?? "var(--muted-foreground)", marginLeft: "auto" }}>{s.amount}</span>}
+                  </div>
+                </div>
               </div>
             );
           })}

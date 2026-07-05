@@ -29,8 +29,15 @@ export default async function Landing() {
     <div style={{ background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", minHeight: "100vh" }}>
       {/* S0 — pencil bar */}
       <div style={{ height: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in oklab, var(--gold) 10%, var(--marble))", fontSize: 13, ...mono }}>
-        {liveCount ? <>● {liveCount} match{liveCount === 1 ? "" : "es"} awaiting verdict</> : <>Live on Arc testnet — {totals.matchesSettled.toLocaleString()} matches settled</>}
-        <Link href="/agora" style={{ color: "var(--link)" }}>Enter the Agora</Link>
+        {liveCount ? (
+          <>
+            <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--laurel)", flexShrink: 0 }} />
+            {liveCount} match{liveCount === 1 ? "" : "es"} awaiting verdict
+          </>
+        ) : (
+          <>Live on Arc testnet — {totals.matchesSettled.toLocaleString()} matches settled</>
+        )}
+        <Link href="/agora" style={{ color: "var(--link)" }}>Enter the Agora →</Link>
       </div>
 
       {/* S1 — hero */}
@@ -41,8 +48,8 @@ export default async function Landing() {
             <span className="text-greek" style={{ fontSize: 26 }}>ἐγγύη</span>
             <span style={{ color: "var(--muted-foreground)" }}> — the pledge of surety, given in the agora.</span>
           </p>
-          <p style={{ margin: 0, fontSize: 20, lineHeight: 1.5, maxWidth: 560, textWrap: "pretty" }}>
-            An AI broker that stakes USDC on its own judgment. Every match bonded on Arc. Every failure compensated.
+          <p style={{ margin: 0, fontSize: 20, lineHeight: 1.5, maxWidth: 580, textWrap: "pretty" }}>
+            The first AI you can hire that stakes its own money on its work. Chat with a broker; it quotes a price and posts a USDC bond behind the job. If its work fails the public validator, you&apos;re paid — price, bond, and a slash of the provider&apos;s stake.
           </p>
           <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
             <Link href="/hire"><Button size="lg">Hire ENGYE</Button></Link>
@@ -66,6 +73,7 @@ export default async function Landing() {
           <path d="M 20 208 h 60 h 64 v -40 h 40 v 80 h 40 v -40 h 56 h 64 v -40 h 40 v 80 h 40 v -40 h 56 h 64 v -40 h 40 v 80 h 40 v -40 h 56" fill="none" stroke="var(--ink)" strokeWidth="3" strokeLinecap="square" />
           <path d="M 680 208 h 32 v -56 h 128 h 60" fill="none" stroke="var(--laurel)" strokeWidth="3" strokeLinecap="square" />
           <path d="M 680 208 h 32 v 88 h 96" fill="none" stroke="var(--oxblood)" strokeWidth="3" strokeLinecap="square" />
+          <path d="M 808 296 v 20 h -40" fill="none" stroke="var(--oxblood)" strokeWidth="3" strokeLinecap="square" opacity="0.5" />
           {STATIONS.map((s) => (
             <g key={s.label}>
               <circle cx={s.x} cy="208" r="7" fill="var(--marble)" stroke="var(--ink)" strokeWidth="3" />
@@ -81,6 +89,7 @@ export default async function Landing() {
           <circle cx="808" cy="296" r="7" fill="var(--marble)" stroke="var(--oxblood)" strokeWidth="3" />
           <text x="828" y="301" fontFamily="Geist, sans-serif" fontSize="13" fill="var(--oxblood)">Fail: bond slashes to you,</text>
           <text x="828" y="318" fontFamily="Geist, sans-serif" fontSize="13" fill="var(--oxblood)">plus a refund.</text>
+          <text x="828" y="338" fontFamily="Geist Mono, monospace" fontSize="12" fill="var(--oxblood)">+bond → requester</text>
           <g transform="translate(280, 208)">
             <circle r="16" fill="var(--ink)" stroke="var(--gold)" strokeWidth="1.5" />
             <circle cx="-4.5" cy="-2" r="3.5" fill="none" stroke="var(--gold)" strokeWidth="1.25" />

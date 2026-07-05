@@ -106,6 +106,52 @@ body {
 /* single slide-fade per new feed row */
 @keyframes engye-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .engye-row-in { animation: engye-row-in var(--dur) var(--ease); }
-@media (prefers-reduced-motion: reduce) { .engye-row-in, [style*="engye-live-pulse"] { animation: none !important; } }
+
+/* ===== tokens/animations.css — tw-animate-css subset (content-entering reveals only) ===== */
+@keyframes engye-enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+  }
+}
+@keyframes engye-exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
+  }
+}
+.animate-in { animation: engye-enter var(--dur, 200ms) var(--ease) both; }
+.animate-out { animation: engye-exit var(--dur, 200ms) var(--ease) both; }
+.fade-in, .fade-in-0 { --tw-enter-opacity: 0; }
+.fade-out, .fade-out-0 { --tw-exit-opacity: 0; }
+.zoom-in-95 { --tw-enter-scale: 0.95; }
+.zoom-in-90 { --tw-enter-scale: 0.90; }
+.slide-in-from-top-2 { --tw-enter-translate-y: -0.5rem; }
+.slide-in-from-top-4 { --tw-enter-translate-y: -1rem; }
+.slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
+.slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
+.slide-in-from-left-4 { --tw-enter-translate-x: -1rem; }
+.slide-in-from-right-4 { --tw-enter-translate-x: 1rem; }
+.duration-150 { animation-duration: 150ms; }
+.duration-200 { animation-duration: 200ms; }
+.duration-300 { animation-duration: 300ms; }
+.delay-75 { animation-delay: 75ms; }
+.delay-150 { animation-delay: 150ms; }
+.delay-300 { animation-delay: 300ms; }
+
+/* verdict-feed arrival flash — one-shot status wash on the newest row */
+@keyframes engye-flash-pass { from { background-color: color-mix(in oklab, var(--laurel) 22%, transparent); } to { background-color: transparent; } }
+@keyframes engye-flash-slash { from { background-color: color-mix(in oklab, var(--oxblood) 22%, transparent); } to { background-color: transparent; } }
+.flash-pass { animation: engye-flash-pass 1.4s var(--ease) both; }
+.flash-slash { animation: engye-flash-slash 1.4s var(--ease) both; }
+
+/* typing indicator dots — the broker composing (the one functional loop) */
+@keyframes engye-typing { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
+.typing-dot { animation: engye-typing 1.2s var(--ease) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .engye-row-in, [style*="engye-live-pulse"],
+  .animate-in, .animate-out, .flash-pass, .flash-slash, .typing-dot { animation: none !important; }
+}
 
 a { color: inherit; }
