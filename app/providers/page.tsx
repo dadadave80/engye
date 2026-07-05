@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/AppShell";
 import { Card, Eyebrow, AddressChip, EmptyState } from "@/components/ui/primitives";
 import { RegisterForm } from "@/components/RegisterForm";
+import { ImportAgentForm } from "@/components/ImportAgentForm";
 import { getProviders, getTotals } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export default async function ProvidersPage() {
           </div>
         </div>
 
+        <ImportAgentForm />
         <RegisterForm />
 
         <Card padding={0}>
