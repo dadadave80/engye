@@ -9,29 +9,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Card, Badge, Eyebrow, EmptyState } from "../ui/primitives";
 import { txUrl } from "@/lib/supabase/public";
 import { VERDICT_WINDOW_SECONDS } from "@/lib/economics";
+import { shapeLive, shapeVerdict, type LiveMatch, type VerdictRow } from "./shape";
 
-export interface LiveMatch {
-  id: string;
-  match_key: string;
-  status: string; // awaiting_verdict | validating | settle_retry
-  verdict_due_at: string | null;
-  price_usdc: number | null;
-  bond_usdc: number | null;
-  deliverable: unknown;
-  task: string;
-  provider: string;
-  confidence: number | null;
-}
-
-export interface VerdictRow {
-  id: string;
-  match_key: string;
-  status: "PASS" | "SLASHED";
-  tx: string | null;
-  at: string;
-  task: string;
-  provider: string;
-}
+export type { LiveMatch, VerdictRow };
 
 const LIVE_STATUSES = new Set(["awaiting_verdict", "validating", "settle_retry"]);
 
@@ -77,25 +57,6 @@ const peek = (d: unknown): string | null => {
   if (!s) return null;
   return s.length > 200 ? `${s.slice(0, 200)}…` : s;
 };
-
-function shapeLive(d: Record<string, any>): LiveMatch {
-  return {
-    id: d.id, match_key: d.match_key, status: d.status, verdict_due_at: d.verdict_due_at,
-    price_usdc: d.price_usdc, bond_usdc: d.bond_usdc, deliverable: d.deliverable,
-    task: d.quotes?.task?.type ?? "task", provider: d.providers?.name ?? "—",
-    confidence: d.quotes?.confidence ?? null,
-  };
-}
-
-function shapeVerdict(d: Record<string, any>): VerdictRow | null {
-  const status: "PASS" | "SLASHED" | null =
-    d.status === "delivered" ? "PASS" : d.status === "failed_compensated" ? "SLASHED" : null;
-  if (!status) return null;
-  return {
-    id: d.id, match_key: d.match_key, status, tx: d.settle_tx ?? d.bond_tx ?? null,
-    at: d.settled_at ?? d.created_at, task: d.quotes?.task?.type ?? "task", provider: d.providers?.name ?? "—",
-  };
-}
 
 function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
   const price = m.price_usdc != null ? Number(m.price_usdc).toFixed(4) : "—";
