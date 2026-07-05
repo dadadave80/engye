@@ -1,7 +1,7 @@
 "use client";
 // One send() the panels call regardless of connect kind:
 //  - EOA (wagmi): submit each call as its own tx (no native batch)
-//  - Passkey (Ithaca): sign one ERC-7821 batch → ENGYE relays it
+//  - Passkey (Circle MSCA): batch the calls into one gasless userOp (Gas Station paymaster)
 import { useWalletClient } from "wagmi";
 import type { Hex } from "viem";
 import { useWallet } from "./useWallet";
@@ -19,7 +19,7 @@ export function useAccountActions() {
   async function send(calls: Call[]): Promise<Hex> {
     if (calls.length === 0) throw new Error("no calls");
     if (wallet.kind === "passkey" && current) {
-      return signAndRelay(current, calls); // one batched, passkey-signed, ENGYE-relayed execute
+      return signAndRelay(current, calls); // one batched, passkey-signed, gasless Circle userOp
     }
     if (wallet.kind === "eoa" && walletClient) {
       let last: Hex | undefined;

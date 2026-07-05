@@ -6,8 +6,9 @@ import { useState } from "react";
 import { useConnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } from "lucide-react";
-import { usePasskey } from "./passkey";
-import { signUpPasskey } from "./passkeyClient";
+import { usePasskey, type PasskeySession } from "./passkey";
+import { signUpPasskey, loginPasskey } from "./passkeyClient";
+import { circleConfigured } from "@/lib/circleWallet";
 
 const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -25,24 +26,25 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
   const [err, setErr] = useState<string | null>(null);
 
   const active = current ?? accounts[0] ?? null;
+  const configured = circleConfigured();
 
-  async function signUp() {
+  async function run(fn: () => Promise<PasskeySession>) {
     setBusy(true); setErr(null);
     try {
-      const s = await signUpPasskey();
-      addAccount(s); // becomes current
+      addAccount(await fn()); // becomes current
       onClose();
     } catch (e) {
-      // ox wraps WebAuthn failures in a generic 'Failed to create credential.' — surface the cause
+      // surface the WebAuthn cause behind any generic wrapper
       const cause = (e as { cause?: { message?: string } })?.cause?.message?.split("\n")[0];
       const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
       setErr(cause && cause !== msg ? `${msg} (${cause})` : msg);
     } finally { setBusy(false); }
   }
+  const signUp = () => run(signUpPasskey);
 
   function continueWith() {
-    if (active) { switchTo(active.address); onClose(); }
-    else signUp();
+    if (active) { switchTo(active.address); onClose(); } // known device → no re-prompt
+    else run(loginPasskey); // returning user, no local session → pick an existing passkey
   }
 
   return (
@@ -78,25 +80,33 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 600 }}>
-                <ScanFace size={18} color="var(--aegean-lifted)" /> Sign in
+                <ScanFace size={18} color="var(--aegean-lifted)" /> Sign in with a passkey
               </div>
               <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
-                Use a passkey to sign in to ENGYE — powered by Porto over an Ithaca smart account on Arc. ENGYE relays gas; you sign with your device.
+                A smart account secured by your device (Face ID / fingerprint) — powered by Circle Modular Wallets on Arc. Gas is sponsored by Circle Gas Station; first tasks are on us.
               </p>
             </div>
 
-            <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={continueWith}>
-              <ScanFace size={16} /> {busy ? "Waiting for passkey…" : "Continue with Porto"}
-            </button>
+            {configured ? (
+              <>
+                <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={continueWith}>
+                  <ScanFace size={16} /> {busy ? "Waiting for passkey…" : active ? "Continue with Passkey" : "Sign in with Passkey"}
+                </button>
 
-            {/* Using · Switch · Sign up (mirrors the Porto dialog footer) */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--muted-foreground)" }}>
-              <span style={mono}>{active ? `Using ${trunc(active.address)}` : "No account yet"}</span>
-              <span style={{ display: "inline-flex", gap: 12 }}>
-                {accounts.length > 1 && <button style={link} onClick={() => setView("switch")}>Switch</button>}
-                <button style={link} onClick={signUp}>Sign Up</button>
-              </span>
-            </div>
+                {/* Using · Switch · Sign up */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13, color: "var(--muted-foreground)" }}>
+                  <span style={mono}>{active ? `Using ${trunc(active.address)}` : "New here?"}</span>
+                  <span style={{ display: "inline-flex", gap: 12 }}>
+                    {accounts.length > 1 && <button style={link} onClick={() => setView("switch")}>Switch</button>}
+                    <button style={link} disabled={busy} onClick={signUp}>Create Passkey</button>
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius)", border: "1px dashed var(--border)", fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
+                Passkey sign-in is being configured. Use a browser wallet below in the meantime.
+              </div>
+            )}
 
             {/* browser wallet (EOA) — a full first-class option: fund it and pay/stake directly.
                 Mobile browsers have no injected provider (no extensions) — show the real path
@@ -112,8 +122,8 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
                 <div style={{ padding: "10px 12px", borderRadius: "var(--radius)", border: "1px dashed var(--border)", color: "var(--muted-foreground)" }}>
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--foreground)" }}><Wallet size={16} /> Browser Wallet</span>
                   <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5 }}>
-                    No wallet found in this browser. On mobile, open <span style={mono}>engye.vercel.app</span> inside your wallet
-                    app&apos;s browser (e.g. MetaMask → menu → Browser) — or use a passkey above; first tasks are sponsored.
+                    No wallet found in this browser. On mobile, open <span style={mono}>engye.vercel.app</span>{" "}
+                    inside your wallet app&apos;s browser (e.g. MetaMask → menu → Browser) — or use a passkey above; first tasks are sponsored.
                   </p>
                 </div>
               )}

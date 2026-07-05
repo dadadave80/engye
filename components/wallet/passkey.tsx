@@ -1,17 +1,19 @@
 "use client";
-// Passkey account store — supports MULTIPLE accounts (for the Switch / Sign up modal UX),
-// built on Porto's Key module over our IthacaAccount on Arc. Persisted in localStorage.
+// Passkey account store — supports MULTIPLE accounts (for the Switch / Sign up modal UX), built on
+// Circle Modular Wallets (passkey-owned MSCA on Arc). Persisted in localStorage (testnet demo; the
+// stored credential is a public id + P256 public key, not a secret — signing always re-prompts the
+// device authenticator).
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import type { Address, Hex } from "viem";
+import type { Address } from "viem";
+import type { StoredCredential } from "@/lib/circleWallet";
 
 export interface PasskeySession {
-  address: Address; // the user's Ithaca smart-account (EOA) address
-  credentialId: string; // WebAuthn credential id
-  credentialPublicKey: Hex; // ox PublicKey hex — reconstructs the key for signing
+  address: Address; // the user's Circle smart-account (MSCA) address
+  credential: StoredCredential; // WebAuthn credential (id + P256 public key) — rebuilds the account
   label?: string; // optional friendly name
 }
 
-const STORE = "engye.passkey.v2";
+const STORE = "engye.passkey.v3"; // v3: Circle MSCA credential shape (was Porto/Ithaca in v2)
 interface Store { accounts: PasskeySession[]; current: string | null }
 const read = (): Store => {
   try { return JSON.parse(localStorage.getItem(STORE) || "") || { accounts: [], current: null }; }
