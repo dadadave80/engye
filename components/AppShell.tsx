@@ -6,6 +6,8 @@ import { LivePill } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
 
 const NAV = [
+  { label: "Hire", href: "/hire" },
+  { label: "Agora", href: "/agora" },
   { label: "Post a Task", href: "/post" },
   { label: "Dashboard", href: "/dashboard" },
   { label: "Providers", href: "/providers" },
