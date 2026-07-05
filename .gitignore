@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# eve
+/.eve/
+
 # production
 /build
 
@@ -60,3 +63,4 @@ wallets*.json
 
 # design reference (claude.ai/design export — implemented code lives in app/ and components/)
 design-system/
+.superpowers/
