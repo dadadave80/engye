@@ -55,7 +55,9 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
     <Card stele padding={16}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Badge status={bonded ? "OPEN" : undefined} label={bonded ? "BONDED QUOTE" : "BEST EFFORT — NO BOND"} />
+          {bonded
+            ? <Badge status="OPEN" label="BONDED QUOTE" />
+            : <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", color: "var(--muted-foreground)", textTransform: "uppercase" }}>Best effort — no bond</span>}
           <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>expires {new Date(q.expires_at).toLocaleTimeString()}</span>
         </div>
         <div style={row}><span>price</span><span>{q.total_price_usdc} USDC</span></div>

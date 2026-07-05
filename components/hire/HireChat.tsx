@@ -21,6 +21,10 @@ function Part({ part }: { part: EveMessagePart }) {
   if (part.type === "dynamic-tool" && part.state === "input-available") {
     return <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>… consulting the registry</div>;
   }
+  // a tool that errored or was denied would otherwise render nothing — leave the user with a gap
+  if (part.type === "dynamic-tool" && (part.state === "output-error" || part.state === "output-denied")) {
+    return <div style={{ fontSize: 12, color: "var(--oxblood-badge)" }}>that step didn&apos;t complete — try rephrasing your request.</div>;
+  }
   return null;
 }
 

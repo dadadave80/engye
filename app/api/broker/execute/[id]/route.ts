@@ -136,15 +136,19 @@ export async function POST(
     txs.pay_tx = String(result.transaction ?? "");
     await supabaseAdmin.from("matches").update({ status: "paid", pay_tx: txs.pay_tx, deliverable }).eq("id", match.id);
 
-    // Phase A ends at delivery: verdict + settlement run after the public window (spec §3.1-3.2)
-    const verdictDueAt = new Date(Date.now() + VERDICT_WINDOW_SECONDS * 1000).toISOString();
+    // Phase A ends at delivery: verdict + settlement run after the public window (spec §3.1-3.2).
+    // Only BONDED matches get the 120s public window — an unbonded (best-effort) match has no bond
+    // on the line and isn't shown on the floor, so it settles immediately (reputation only), instead
+    // of tying up a 2-min serverless invocation for a verdict nobody acts on.
+    const windowSeconds = bonded ? VERDICT_WINDOW_SECONDS : 0;
+    const verdictDueAt = new Date(Date.now() + windowSeconds * 1000).toISOString();
     await supabaseAdmin.from("matches").update({
       status: "awaiting_verdict", verdict_due_at: verdictDueAt, requester_wallet: requester,
     }).eq("id", match.id);
 
     if (process.env.ENGYE_DISABLE_AFTER !== "1") {
       after(async () => {
-        await new Promise((r) => setTimeout(r, VERDICT_WINDOW_SECONDS * 1000 + 1_000));
+        if (windowSeconds > 0) await new Promise((r) => setTimeout(r, windowSeconds * 1000 + 1_000));
         try { await settleMatch(match.id); } catch (e) { console.error(`[execute ${id}] phase B:`, e); }
       });
     }
