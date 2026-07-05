@@ -181,6 +181,13 @@ body {
 .row-hover { transition: background-color var(--dur-fast) var(--ease); }
 .row-hover:hover { background-color: color-mix(in oklab, var(--foreground) 4%, transparent); }
 
+/* assistant-ui hire chat: composer card ring on focus-within; pill hover; disabled send */
+.aui-composer { transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.aui-composer:focus-within { border-color: color-mix(in oklab, var(--ring) 55%, var(--input)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 25%, transparent); }
+.aui-pill { transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.aui-pill:hover { background-color: var(--secondary); }
+.aui-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
 @media (prefers-reduced-motion: reduce) {
   .engye-row-in, [style*="engye-live-pulse"],
   .animate-in, .animate-out, .flash-pass, .flash-slash, .typing-dot { animation: none !important; }
