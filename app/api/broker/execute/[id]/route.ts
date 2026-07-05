@@ -4,17 +4,16 @@
 // → release | slash + stake-slash + vault refund (rail B) → ERC-8004 giveFeedback.
 // One bytes32 matchKey links every step. If this process dies mid-match, the bond's
 // permissionless claim_timeout() protects the requester.
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { keccak256, toBytes, type Address, type Hex } from "viem";
 import { supabaseAdmin } from "@/lib/db";
 import { buildRequirements, paymentRequired, verifyAndSettle, payEndpoint, ensureGatewayFloat } from "@/lib/x402";
-import { createBond, releaseBond, slashBond, slashProviderStake, refundFromTreasury, arcscanTx } from "@/lib/escrow";
-import { requestValidation, respondValidation, giveFeedback, contentHash } from "@/lib/erc8004";
-import { validateDeliverable } from "@/lib/validator";
-import { applyOutcome } from "@/lib/reputation";
-import { MATCH_TTL_SECONDS } from "@/lib/economics";
+import { createBond, arcscanTx } from "@/lib/escrow";
+import { requestValidation } from "@/lib/erc8004";
+import { MATCH_TTL_SECONDS, VERDICT_WINDOW_SECONDS } from "@/lib/economics";
+import { settleMatch } from "@/lib/settle";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 /** In-house provider wallets we can sign for (external providers: undefined). */
 function pkForWallet(wallet: string): string | undefined {
@@ -115,60 +114,28 @@ export async function POST(
     txs.pay_tx = String(result.transaction ?? "");
     await supabaseAdmin.from("matches").update({ status: "paid", pay_tx: txs.pay_tx, deliverable }).eq("id", match.id);
 
-    // blind validation (LLM decision #2) + on-chain verdict from the validator's own identity
-    const v = await validateDeliverable(quote.task.spec, quote.task.quality_bar, deliverable, match.id);
-    await supabaseAdmin.from("validations").insert({
-      match_id: match.id, pass: v.pass, score: v.score, reasons: v.reasons, model: v.model,
-    });
-    if (txs.validation_request_tx) {
-      txs.validation_response_tx = await respondValidation({
-        matchKey, score: v.score, deliverableHash: contentHash(JSON.stringify(deliverable ?? null)), passed: v.pass,
-      });
-    }
-
-    // settle (rail B)
-    if (bonded) {
-      if (v.pass) {
-        txs.settle_tx = await releaseBond(matchKey);
-      } else {
-        txs.slash_tx = await slashBond(matchKey);
-        txs.stake_slash_tx = await slashProviderStake(matchKey, provider.wallet_address as Address, requester, Number(quote.bond_usdc));
-        txs.refund_tx = await refundFromTreasury(matchKey, requester, Number(quote.total_price_usdc));
-      }
-    }
-
-    // reputation: canonical registry + aggregates
-    if (provider.agent_id) {
-      txs.feedback_tx = await giveFeedback({
-        providerAgentId: BigInt(provider.agent_id), score: v.score, passed: v.pass, matchKey,
-      });
-    }
-    await applyOutcome({
-      providerId: provider.id, matchId: match.id, pass: v.pass, score: v.score,
-      latencyMs: Date.now() - startedAt, earnedUsdc: Number(provider.price_usdc), onchainTx: txs.feedback_tx,
-    });
-
-    const status = !bonded ? "delivered" : v.pass ? "delivered" : "failed_compensated";
+    // Phase A ends at delivery: verdict + settlement run after the public window (spec §3.1-3.2)
+    const verdictDueAt = new Date(Date.now() + VERDICT_WINDOW_SECONDS * 1000).toISOString();
     await supabaseAdmin.from("matches").update({
-      status, latency_ms: Date.now() - startedAt, settled_at: new Date().toISOString(),
-      settle_tx: txs.settle_tx ?? txs.slash_tx ?? null, refund_tx: txs.refund_tx ?? null,
-      validation_response_tx: txs.validation_response_tx ?? null, feedback_tx: txs.feedback_tx ?? null,
-      stake_slash_tx: txs.stake_slash_tx ?? null,
+      status: "awaiting_verdict", verdict_due_at: verdictDueAt, requester_wallet: requester,
     }).eq("id", match.id);
 
-    if (status === "failed_compensated") {
+    if (process.env.ENGYE_DISABLE_AFTER !== "1") {
+      after(async () => {
+        await new Promise((r) => setTimeout(r, VERDICT_WINDOW_SECONDS * 1000 + 1_000));
+        try { await settleMatch(match.id); } catch (e) { console.error(`[execute ${id}] phase B:`, e); }
+      });
+    }
+
+    if (!bonded) {
       return NextResponse.json({
-        match_id: match.id, match_key: matchKey, status,
-        validation: { pass: v.pass, score: v.score, reasons: v.reasons },
-        slash_tx: arcscanTx(txs.slash_tx), refund_tx: arcscanTx(txs.refund_tx),
-        stake_slash_tx: arcscanTx(txs.stake_slash_tx), bond_tx: arcscanTx(txs.bond_tx),
+        match_id: match.id, match_key: matchKey, status: "delivered", deliverable,
+        tier: "best_effort_unbonded", watch_url: `/m/${matchKey}`,
       });
     }
     return NextResponse.json({
-      match_id: match.id, match_key: matchKey, status, deliverable,
-      validation: { pass: v.pass, score: v.score, reasons: v.reasons },
-      ...(bonded && { bond_tx: arcscanTx(txs.bond_tx), settle_tx: arcscanTx(txs.settle_tx) }),
-      ...(!bonded && { tier: "best_effort_unbonded" }),
+      match_id: match.id, match_key: matchKey, status: "delivered_awaiting_verdict", deliverable,
+      verdict_due_at: verdictDueAt, watch_url: `/m/${matchKey}`, bond_tx: arcscanTx(txs.bond_tx),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

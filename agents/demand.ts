@@ -110,7 +110,7 @@ async function cycle(): Promise<void> {
     { method: "POST", body: "{}" },
   );
   const d = result.data as any;
-  console.log(`outcome: ${d.status} (score ${d.validation?.score}) — paid $${quote.total_price_usdc}`);
+  console.log(`outcome: ${d.status}${d.verdict_due_at ? ` (verdict due ${d.verdict_due_at})` : ""} — paid $${quote.total_price_usdc}`);
 }
 
 const ledgerId = () => `demand:${new Date().toISOString().slice(0, 10)}`;

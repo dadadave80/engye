@@ -24,3 +24,5 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DAILY_DEMAND_BUDGET: "2.0"
+      # settle heartbeat: sweeps matches whose verdict window has elapsed (spec §3.3)
+      - run: curl -s -X POST "${{ secrets.APP_URL }}/api/settle" || true
