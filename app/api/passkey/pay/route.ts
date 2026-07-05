@@ -112,7 +112,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     (l.args.from as string).toLowerCase() === (account as string).toLowerCase() &&
     (l.args.to as string).toLowerCase() === BROKER.toLowerCase() &&
     l.args.value === expected);
-  if (!ok) return NextResponse.json({ error: "relayed tx did not emit the expected USDC transfer", tx: hash }, { status: 500 });
+  if (!ok) {
+    // Near-impossible: relayPasskeyExecute already confirmed the tx SUCCEEDED on-chain, and we
+    // validated the exact transfer(BROKER, amount) calldata before relaying — so for the log to
+    // mismatch, the USDC contract would have had to behave non-standardly. Money has moved; like the
+    // receipt-fetch branch we deliberately do NOT delete the claim (a retry could double-transfer).
+    // Leave the pending row + the unique index to block retries, and log loudly for reconciliation.
+    console.error(`[passkey/pay] Transfer log mismatch after a confirmed relay — quote ${quote_id}, tx ${hash}; claim left pending for manual reconciliation`);
+    return NextResponse.json({ error: "relayed tx did not emit the expected USDC transfer", tx: hash }, { status: 500 });
+  }
 
   const { error } = await supabaseAdmin.from("payments").update({ gateway_tx: hash }).eq("quote_id", quote_id).eq("direction", "inbound");
   if (error) return NextResponse.json({ error: `proof persist failed: ${error.message}`, tx: hash }, { status: 500 });
