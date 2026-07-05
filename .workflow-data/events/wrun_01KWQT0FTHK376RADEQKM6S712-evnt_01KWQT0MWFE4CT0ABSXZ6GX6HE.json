@@ -1,0 +1,41 @@
+{
+  "eventType": "attr_set",
+  "specVersion": 5,
+  "eventData": {
+    "changes": [
+      {
+        "key": "$eve.model",
+        "value": "groq/openai/gpt-oss-120b"
+      },
+      {
+        "key": "$eve.input_tokens",
+        "value": "1256"
+      },
+      {
+        "key": "$eve.output_tokens",
+        "value": "95"
+      },
+      {
+        "key": "$eve.cache_read_tokens",
+        "value": "0"
+      },
+      {
+        "key": "$eve.cache_write_tokens",
+        "value": "0"
+      },
+      {
+        "key": "$eve.tool_count",
+        "value": "5"
+      }
+    ],
+    "writer": {
+      "type": "step",
+      "stepId": "step_01KWQT0FTHR6ME2PM6BZ008C7Y",
+      "attempt": 1
+    },
+    "allowReservedAttributes": true
+  },
+  "runId": "wrun_01KWQT0FTHK376RADEQKM6S712",
+  "eventId": "evnt_01KWQT0MWFE4CT0ABSXZ6GX6HE",
+  "createdAt": "2026-07-05T00:14:24.143Z"
+}
