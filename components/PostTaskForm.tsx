@@ -2,6 +2,7 @@
 // The hero flow: a human requester connects, gets a live bonded quote, and PAYS FROM THEIR
 // OWN WALLET (x402/Gateway). On failure the bond + refund land in their wallet on-chain.
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAccount, useWalletClient } from "wagmi";
 import { Card, Button, Input, Eyebrow, Badge, AddressChip } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
@@ -15,6 +16,7 @@ type Quote =
 const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 
 export function PostTaskForm() {
+  const router = useRouter();
   const { isConnected } = useAccount();
   const { data: wallet } = useWalletClient();
   const [type, setType] = useState("question-answering");
@@ -48,6 +50,10 @@ export function PostTaskForm() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? body.error ?? "execution failed");
       setResult(body);
+      // Both bonded (status: "delivered_awaiting_verdict") and unbonded (status: "delivered")
+      // responses carry a match_key — send the requester straight to the match page, which
+      // renders the live verdict (or the settled unbonded record) itself.
+      if (body.match_key) router.push(`/m/${body.match_key}`);
     } catch (e) { setErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
     finally { setBusy(null); }
   }
@@ -103,26 +109,18 @@ export function PostTaskForm() {
 
       {result && (
         <Card stele padding={24}>
+          {/* Delivery no longer implies a verdict — a bonded match returns "delivered_awaiting_verdict"
+              with no validation/slash_tx/settle_tx/refund_tx yet (those land async). This is just the
+              pre-redirect flash; router.push above sends the requester to /m/[matchKey] to watch the
+              live verdict (bonded) or see the settled record (unbonded) there instead. */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Badge status={result.status === "delivered" ? "PASS" : "SLASHED"} />
-              <span style={{ fontSize: 15, fontWeight: 600 }}>{result.status === "delivered" ? "Delivered — validation passed" : "Failed — you were compensated"}</span>
+              <Badge status="OPEN" label="delivered" />
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Delivered — opening your match page…</span>
             </div>
-            {(result.validation as { reasons?: string[] })?.reasons?.length ? (
-              <p style={{ fontSize: 13, color: "var(--muted-foreground)", margin: 0 }}>{(result.validation as { reasons: string[] }).reasons.join(" · ")}</p>
+            {result.bond_tx ? (
+              <a href={`${ARCSCAN}/tx/${result.bond_tx}`} target="_blank" rel="noreferrer" style={{ color: "var(--link)", ...mono, fontSize: 13 }}>bond: {(result.bond_tx as string).slice(0, 10)}…</a>
             ) : null}
-            {result.deliverable ? (
-              <pre style={{ ...mono, fontSize: 12.5, background: "var(--secondary)", padding: 12, borderRadius: "var(--radius)", overflowX: "auto", margin: 0 }}>{JSON.stringify(result.deliverable, null, 2)}</pre>
-            ) : null}
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13 }}>
-              {(["bond_tx", "settle_tx", "slash_tx", "refund_tx"] as const).map((k) => {
-                const v = result[k] as string | undefined;
-                if (!v) return null;
-                const hash = v.startsWith("http") ? v.split("/tx/")[1] : v;
-                return <a key={k} href={v.startsWith("http") ? v : `${ARCSCAN}/tx/${v}`} target="_blank" rel="noreferrer" style={{ color: "var(--link)", ...mono }}>{k.replace("_tx", "")}: {hash.slice(0, 10)}…</a>;
-              })}
-            </div>
-            <div><Button variant="outline" size="sm" onClick={() => { setResult(null); setQuote(null); setSpec(""); }}>Post another</Button></div>
           </div>
         </Card>
       )}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Eyebrow, Card, Button, AddressChip } from "@/components/ui/primitives";
 import { getTotals, getFeed } from "@/lib/queries";
+import { supabasePublic } from "@/lib/supabase/public";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -17,15 +18,19 @@ const STATIONS = [
 ];
 
 export default async function Landing() {
-  const [totals, feed] = await Promise.all([getTotals(), getFeed(1)]);
+  const [totals, feed, { count: liveCount }] = await Promise.all([
+    getTotals(),
+    getFeed(1),
+    supabasePublic().from("matches").select("id", { count: "exact", head: true }).in("status", ["awaiting_verdict", "validating", "settle_retry"]),
+  ]);
   const lastBondTx = feed[0]?.tx ?? null;
 
   return (
     <div style={{ background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", minHeight: "100vh" }}>
       {/* S0 — pencil bar */}
       <div style={{ height: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "color-mix(in oklab, var(--gold) 10%, var(--marble))", fontSize: 13, ...mono }}>
-        Live on Arc testnet — {totals.matchesSettled.toLocaleString()} matches settled
-        <Link href="/dashboard" style={{ color: "var(--link)" }}>Watch the market</Link>
+        {liveCount ? <>● {liveCount} match{liveCount === 1 ? "" : "es"} awaiting verdict</> : <>Live on Arc testnet — {totals.matchesSettled.toLocaleString()} matches settled</>}
+        <Link href="/agora" style={{ color: "var(--link)" }}>Enter the Agora</Link>
       </div>
 
       {/* S1 — hero */}
@@ -40,8 +45,8 @@ export default async function Landing() {
             An AI broker that stakes USDC on its own judgment. Every match bonded on Arc. Every failure compensated.
           </p>
           <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
-            <Link href="/post"><Button size="lg">Post a task</Button></Link>
-            <Link href="/dashboard"><Button size="lg" variant="outline">Watch the market</Button></Link>
+            <Link href="/hire"><Button size="lg">Hire ENGYE</Button></Link>
+            <Link href="/agora"><Button size="lg" variant="outline">Watch the floor</Button></Link>
             <Link href="/stake"><Button size="lg" variant="ghost">Stake as a provider</Button></Link>
           </div>
         </div>
