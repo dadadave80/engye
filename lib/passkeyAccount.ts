@@ -9,6 +9,8 @@ import { supabaseAdmin } from "./db";
 
 const USDC = (process.env.USDC_ADDRESS ?? "0x3600000000000000000000000000000000000000") as Address;
 const DEMO_SPONSOR = 250_000n; // 0.25 USDC so a fresh passkey user can pay a first task (testnet demo)
+const DAILY_SPONSOR_CAP_USDC = 10; // hard bound on total sponsor drain/day (~40 accounts) — the real
+// anti-drain control, since Circle's browser-only SDK can't re-derive the address server-side to verify it
 
 function relayer() {
   const pk = process.env.BROKER_PRIVATE_KEY as Hex;
@@ -38,6 +40,17 @@ export async function registerPasskeyAccount(opts: { credentialId: string; accou
     const { data: won } = await supabaseAdmin.from("passkey_accounts").select("account").eq("credential_id", opts.credentialId).maybeSingle();
     if (won?.account) return won.account as Address;
     throw new Error(`register claim failed: ${claimErr.message}`);
+  }
+
+  // global daily sponsor budget: bounds total testnet USDC at risk regardless of attacker IPs (we
+  // can't verify the address — Circle's SDK is browser-only). Registrations past the cap still
+  // succeed; they just don't get the demo float. Count today's rows (this one included).
+  const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
+  const { count } = await supabaseAdmin.from("passkey_accounts").select("*", { count: "exact", head: true }).gte("created_at", dayStart.toISOString());
+  const spentTodayUsdc = (count ?? 1) * (Number(DEMO_SPONSOR) / 1e6);
+  if (spentTodayUsdc > DAILY_SPONSOR_CAP_USDC) {
+    console.warn(`[passkey] daily sponsor cap $${DAILY_SPONSOR_CAP_USDC} reached — registered ${address} without the demo float`);
+    return opts.account;
   }
 
   // one-time USDC sponsor (best-effort — the account, not gas, needs USDC to pay a task; gas is on Gas Station)

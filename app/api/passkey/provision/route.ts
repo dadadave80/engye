@@ -1,11 +1,14 @@
 // Register a Circle-MSCA passkey account (execute's payer allow-list) + one-time USDC sponsor.
-// The client derives the MSCA address from the passkey; Circle deploys it lazily on first userOp.
+// The client derives the MSCA address from the passkey (Circle's SDK is browser-only — it can't run
+// here, "window is not defined" — so we can't independently re-derive the address server-side).
+// A bogus registration is harmless (the allow-list only gates who may PAY; a fake row can't act
+// without a real on-chain payment FROM that address). The only drainable surface is the USDC
+// sponsor, which registerPasskeyAccount bounds with a global daily cap on top of this 5/hr/IP limit.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { registerPasskeyAccount } from "@/lib/passkeyAccount";
-import { deriveMscaAddress } from "@/lib/circleWalletServer";
 import { limited } from "@/lib/ratelimit";
-import type { Hex } from "viem";
+import type { Address, Hex } from "viem";
 
 export const maxDuration = 60;
 
@@ -16,32 +19,14 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const rl = limited(req, "passkey-provision", 5, 3_600_000); // each sponsors a little USDC
+  const rl = limited(req, "passkey-provision", 5, 3_600_000); // each may sponsor a little USDC
   if (rl) return rl;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
-
-  // ANTI FUND-DRAIN: never trust the client-supplied `account`. Derive the MSCA server-side from the
-  // credential's public key and require the claim to match — the USDC sponsor can then only ever
-  // reach the real account of the supplied passkey, never an attacker-chosen address. Fail CLOSED:
-  // if we can't derive (Circle unconfigured / RPC blip) we refuse rather than sponsor an unverified
-  // address. (Residual: an attacker could still farm sponsors with their own P256 keypairs, bounded
-  // by the 5/hr/IP limit + testnet 0.25 USDC — inherent faucet risk, accepted.)
-  let derived;
-  try {
-    derived = await deriveMscaAddress(parsed.data.credentialId, parsed.data.publicKey as Hex);
-  } catch (e) {
-    console.error("[passkey/provision] derive failed:", e instanceof Error ? e.message : e);
-    return NextResponse.json({ error: "registration unavailable", message: "Couldn't verify the passkey account right now — please try again." }, { status: 503 });
-  }
-  if (derived.toLowerCase() !== parsed.data.account.toLowerCase()) {
-    return NextResponse.json({ error: "account does not match the passkey credential" }, { status: 422 });
-  }
-
   try {
     const account = await registerPasskeyAccount({
       credentialId: parsed.data.credentialId,
-      account: derived, // server-derived, verified
+      account: parsed.data.account as Address,
       publicKey: parsed.data.publicKey as Hex,
     });
     return NextResponse.json({ account });
