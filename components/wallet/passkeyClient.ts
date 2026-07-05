@@ -8,7 +8,9 @@ import { registerCredential, loginCredential, accountFromCredential, sendCalls, 
 import type { PasskeySession } from "./passkey";
 import type { Call } from "@/lib/ithaca";
 
+// Circle usernames: 5–50 chars, only alphanumeric + _@.:+- (no interpunct/spaces). rand() is base36.
 const rand = () => Math.random().toString(36).slice(2, 8);
+const genUsername = () => `ENGYE-${rand()}`;
 
 /** Server-side: register the MSCA in passkey_accounts (execute's payer check) + sponsor a little USDC. */
 async function registerAccount(credential: StoredCredential, address: string): Promise<void> {
@@ -20,7 +22,7 @@ async function registerAccount(credential: StoredCredential, address: string): P
 
 /** Sign up: create a NEW passkey (device biometrics) and derive + register its Circle MSCA. */
 export async function signUpPasskey(label?: string): Promise<PasskeySession> {
-  const username = label?.trim() || `ENGYE·${rand()}`;
+  const username = label?.trim() || genUsername();
   const credential = await registerCredential(username);
   const account = await accountFromCredential(credential);
   await registerAccount(credential, account.address);
