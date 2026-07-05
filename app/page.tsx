@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Eyebrow, Card, Button, AddressChip } from "@/components/ui/primitives";
+import { GravityStars } from "@/components/ui/GravityStars";
+import { CountUp } from "@/components/ui/CountUp";
 import { getTotals, getFeed } from "@/lib/queries";
 import { supabasePublic } from "@/lib/supabase/public";
 
@@ -41,8 +43,9 @@ export default async function Landing() {
       </div>
 
       {/* S1 — hero */}
-      <section className="section-pad">
-        <div className="container r-hero">
+      <section className="section-pad" style={{ position: "relative", overflow: "hidden" }}>
+        <GravityStars color="var(--gold)" starsOpacity={0.45} />
+        <div className="container r-hero" style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
             <h1 className="text-hero" style={{ margin: 0, overflowWrap: "break-word" }} translate="no">ENGYE</h1>
             <p style={{ margin: 0, fontSize: 18 }}>
@@ -114,7 +117,7 @@ export default async function Landing() {
             <div>THEY&apos;LL BE <span style={{ color: "var(--clay)" }}>UNDERWRITTEN</span> BY AGENTS.</div>
           </div>
           <div style={{ display: "flex", gap: 16, marginTop: 40, flexWrap: "wrap" }}>
-            <Card padding={16} style={{ maxWidth: "min(380px, 100%)", minWidth: 0, flex: "1 1 260px" }}>
+            <Card interactive padding={16} style={{ maxWidth: "min(380px, 100%)", minWidth: 0, flex: "1 1 260px" }}>
               <div style={{ ...mono, fontSize: 12.5, lineHeight: 1.7, whiteSpace: "pre", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>{`{
   "match": "provider",
   "confidence": 0.91,
@@ -122,7 +125,7 @@ export default async function Landing() {
   "reason": "94% pass over 40 trials"
 }`}</div>
             </Card>
-            <Card padding={16} style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center", minWidth: 0, flex: "1 1 260px" }}>
+            <Card interactive padding={16} style={{ display: "flex", flexDirection: "column", gap: 8, justifyContent: "center", minWidth: 0, flex: "1 1 260px" }}>
               <span style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted-foreground)" }}>Latest bond escrowed on Arc</span>
               {lastBondTx ? <AddressChip address={lastBondTx} href={`${ARCSCAN}/tx/${lastBondTx}`} /> : <span style={mono}>awaiting first match…</span>}
             </Card>
@@ -136,15 +139,15 @@ export default async function Landing() {
           <Eyebrow>Live on Arc</Eyebrow>
           <div className="r-stat-grid">
             {[
-              { label: "Matches settled", value: totals.matchesSettled.toLocaleString(), color: "#EDE7D8" },
-              { label: "USDC settled", value: usd(totals.usdcSettled), color: "#EDE7D8" },
-              { label: "Bonds at risk", value: usd(totals.bondsAtRisk), color: "var(--gold-lifted)" },
-              { label: "Slashes compensated", value: usd(totals.slashesCompensated), color: "var(--oxblood-badge)" },
+              { label: "Matches settled", value: totals.matchesSettled, format: "int" as const, color: "#EDE7D8" },
+              { label: "USDC settled", value: totals.usdcSettled, format: "usd" as const, color: "#EDE7D8" },
+              { label: "Bonds at risk", value: totals.bondsAtRisk, format: "usd" as const, color: "var(--gold-lifted)" },
+              { label: "Slashes compensated", value: totals.slashesCompensated, format: "usd" as const, color: "var(--oxblood-badge)" },
             ].map((s) => (
               <div key={s.label} style={{ borderTop: "1px solid #EDE7D8", position: "relative", paddingTop: 20 }}>
                 <div style={{ position: "absolute", top: 3, left: 0, right: 0, borderTop: "1px solid #EDE7D8" }} />
                 <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "#A79D8C", marginBottom: 12 }}>{s.label}</div>
-                <div style={{ ...mono, fontSize: "clamp(28px, 8vw, 44px)", color: s.color }}>{s.value}</div>
+                <CountUp value={s.value} format={s.format} style={{ ...mono, display: "block", fontSize: "clamp(28px, 8vw, 44px)", color: s.color }} />
               </div>
             ))}
           </div>

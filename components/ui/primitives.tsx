@@ -14,10 +14,10 @@ export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSP
 
 /* ---------- Card (stele = double top rule via inset shadow, squared top corners) ---------- */
 export function Card({
-  stele = false, padding = 16, children, style,
-}: { stele?: boolean; padding?: number; children: ReactNode; style?: CSSProperties }) {
+  stele = false, padding = 16, children, style, interactive = false, className,
+}: { stele?: boolean; padding?: number; children: ReactNode; style?: CSSProperties; interactive?: boolean; className?: string }) {
   return (
-    <div style={{
+    <div className={[interactive ? "card-lift" : "", className ?? ""].join(" ").trim() || undefined} style={{
       background: "var(--card)", color: "var(--card-foreground)",
       border: "1px solid var(--border)", borderRadius: "var(--radius)", padding,
       ...(stele ? {

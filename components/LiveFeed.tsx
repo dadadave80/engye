@@ -62,7 +62,7 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
         </tr></thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className={r.id === freshId ? "engye-row-in" : undefined}>
+            <tr key={r.id} className={["row-hover", r.id === freshId ? "engye-row-in" : ""].join(" ").trim()}>
               <td style={{ ...td, color: "var(--muted-foreground)" }} title={r.created_at}>{rel(r.created_at)}</td>
               <td style={td}>{r.task}{r.source === "demand_agent" && <span style={{ ...mono, fontSize: 10, color: "var(--muted-foreground)", marginLeft: 6 }}>·demand</span>}</td>
               <td style={td}>{r.provider}</td>

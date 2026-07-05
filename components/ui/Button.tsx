@@ -1,46 +1,56 @@
 "use client";
-import { useState, type CSSProperties, type ReactNode } from "react";
+// ENGYE button — animate-ui swap: the animate-ui button pattern (cva variants + motion.button
+// press/hover primitive), remapped from Tailwind's default palette to ENGYE tokens (wired into
+// @theme in globals.css). Keeps ENGYE's variant/size vocabulary so the 9 call-sites don't churn,
+// and its ≥44px `md` touch target. Scale interaction is subtle (not the library's 1.05/0.95) and
+// respects prefers-reduced-motion via <MotionConfig reducedMotion="user"> in WalletProvider.
+import { type CSSProperties, type ReactNode } from "react";
+import { motion } from "motion/react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "outline" | "ghost" | "accent" | "destructive";
-type Size = "sm" | "md" | "lg";
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-sans font-medium leading-none select-none cursor-pointer outline-none transition-colors [&_svg]:shrink-0 [&_svg]:pointer-events-none disabled:opacity-55 disabled:cursor-not-allowed disabled:pointer-events-none",
+  {
+    variants: {
+      variant: {
+        primary: "bg-primary text-primary-foreground hover:bg-primary/90",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        outline: "border border-border bg-transparent text-foreground hover:bg-foreground/[0.06]",
+        ghost: "bg-transparent text-foreground hover:bg-foreground/[0.06]",
+        accent: "bg-accent text-accent-foreground hover:bg-accent/90",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+      },
+      size: {
+        sm: "min-h-8 px-3.5 text-[13px] gap-1.5",
+        md: "min-h-11 px-5 text-sm", // ≥44px touch target
+        lg: "min-h-[52px] px-7 text-base",
+      },
+    },
+    defaultVariants: { variant: "primary", size: "md" },
+  },
+);
 
-const SIZES: Record<Size, CSSProperties> = {
-  sm: { padding: "6px 14px", fontSize: 13, minHeight: 32 },
-  md: { padding: "10px 20px", fontSize: 14, minHeight: 44 }, // ≥44px touch target
-  lg: { padding: "14px 28px", fontSize: 16, minHeight: 52 },
-};
+type Variant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+type Size = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
 
-/** ENGYE button — hover = bg/color shift only (never scale/shadow); focus ring gold. */
 export function Button({
-  variant = "primary", size = "md", disabled = false, children, onClick, style, type = "button",
+  variant = "primary", size = "md", disabled = false, children, onClick, style, type = "button", className,
 }: {
   variant?: Variant; size?: Size; disabled?: boolean; children: ReactNode;
-  onClick?: () => void; style?: CSSProperties; type?: "button" | "submit";
+  onClick?: () => void; style?: CSSProperties; type?: "button" | "submit"; className?: string;
 }) {
-  const [hover, setHover] = useState(false);
-  const variants: Record<Variant, CSSProperties> = {
-    primary: { background: hover ? "color-mix(in oklab, var(--primary) 88%, var(--background))" : "var(--primary)", color: "var(--primary-foreground)", border: "1px solid transparent" },
-    secondary: { background: hover ? "color-mix(in oklab, var(--secondary) 92%, var(--foreground))" : "var(--secondary)", color: "var(--secondary-foreground)", border: "1px solid transparent" },
-    outline: { background: hover ? "color-mix(in oklab, var(--foreground) 6%, transparent)" : "transparent", color: "var(--foreground)", border: "1px solid var(--border)" },
-    ghost: { background: hover ? "color-mix(in oklab, var(--foreground) 6%, transparent)" : "transparent", color: "var(--foreground)", border: "1px solid transparent" },
-    accent: { background: hover ? "color-mix(in oklab, var(--accent) 90%, var(--background))" : "var(--accent)", color: "var(--accent-foreground)", border: "1px solid transparent" },
-    destructive: { background: hover ? "color-mix(in oklab, var(--destructive) 90%, var(--background))" : "var(--destructive)", color: "var(--destructive-foreground)", border: "1px solid transparent" },
-  };
   return (
-    <button
+    <motion.button
       type={type} disabled={disabled} onClick={onClick}
-      className="focus-ring"
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{
-        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-        fontFamily: "var(--font-body)", fontWeight: 500, lineHeight: 1,
-        borderRadius: "var(--radius)", cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background-color var(--dur) var(--ease), color var(--dur) var(--ease)",
-        opacity: disabled ? 0.55 : 1, outline: "none",
-        ...SIZES[size], ...variants[variant], ...style,
-      }}
+      className={cn(buttonVariants({ variant, size }), "focus-ring", className)}
+      whileHover={disabled ? undefined : { scale: 1.02 }}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
+      style={style}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }
+
+export { buttonVariants };

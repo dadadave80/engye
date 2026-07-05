@@ -5,6 +5,7 @@ import { createConfig, http, WagmiProvider } from "wagmi";
 import { arcTestnet } from "viem/chains";
 import { injected } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "motion/react";
 import { type ReactNode, useState } from "react";
 import { PasskeyProvider } from "./passkey";
 
@@ -20,7 +21,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={qc}>
-        <PasskeyProvider>{children}</PasskeyProvider>
+        <MotionConfig reducedMotion="user">
+          <PasskeyProvider>{children}</PasskeyProvider>
+        </MotionConfig>
       </QueryClientProvider>
     </WagmiProvider>
   );

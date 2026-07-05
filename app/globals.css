@@ -64,7 +64,22 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --font-sans: var(--font-body);
@@ -154,10 +169,23 @@ body {
    class carries the origin and kills the transition under reduced-motion. */
 .bar-fill { transform-origin: left center; }
 
+/* interactive surface — subtle hover lift + gold-edge glow (cards, panels). Transform-only. */
+.card-lift { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
+.card-lift:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--ring) 45%, var(--border));
+  box-shadow: 0 6px 20px -12px color-mix(in oklab, var(--foreground) 55%, transparent);
+}
+
+/* table row hover wash — feed + leaderboard */
+.row-hover { transition: background-color var(--dur-fast) var(--ease); }
+.row-hover:hover { background-color: color-mix(in oklab, var(--foreground) 4%, transparent); }
+
 @media (prefers-reduced-motion: reduce) {
   .engye-row-in, [style*="engye-live-pulse"],
   .animate-in, .animate-out, .flash-pass, .flash-slash, .typing-dot { animation: none !important; }
-  .bar-fill { transition: none !important; }
+  .bar-fill, .card-lift, .row-hover { transition: none !important; }
+  .card-lift:hover { transform: none; }
 }
 
 a { color: inherit; }

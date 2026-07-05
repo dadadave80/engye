@@ -38,7 +38,7 @@ export default async function ProvidersPage() {
                 </tr></thead>
                 <tbody>
                   {providers.map((p, i) => (
-                    <tr key={p.id}>
+                    <tr key={p.id} className="row-hover animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
                       <td style={{ ...td, ...mono, color: "var(--muted-foreground)" }}>{i + 1}</td>
                       <td style={{ ...td, fontWeight: 500 }}>{p.name}{p.inHouse && <span style={{ ...mono, fontSize: 10, color: "var(--muted-foreground)", marginLeft: 6 }}>·in-house</span>}</td>
                       <td style={{ ...td, ...mono }}>{p.confidence.toFixed(2)}</td>
