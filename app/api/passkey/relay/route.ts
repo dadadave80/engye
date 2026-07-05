@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { relayPasskeyExecute } from "@/lib/passkeyAccount";
-import { limited } from "@/lib/ratelimit";
+import { limited, rateLimit } from "@/lib/ratelimit";
 import type { Address, Hex } from "viem";
 
 export const maxDuration = 60;
@@ -17,6 +17,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (rl) return rl;
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
+  if (!rateLimit(`relay-acct:${parsed.data.account.toLowerCase()}`, 20, 60_000)) {
+    return NextResponse.json({ error: "rate limited", detail: "too many relays for this account" }, { status: 429 });
+  }
   try {
     const hash = await relayPasskeyExecute(parsed.data.account as Address, parsed.data.executionData as Hex);
     return NextResponse.json({ hash });

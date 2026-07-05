@@ -48,3 +48,6 @@ export const gatewayWalletAbi = [
 export const publicClient = createPublicClient({ chain: arcTestnet, transport: http(RPC_URL, { timeout: 15_000, retryCount: 3, retryDelay: 200 }), pollingInterval: 1000 });
 export const usdcAtomic = (usdc: number) => BigInt(Math.round(usdc * 1e6));
 export const fromAtomic = (v: bigint) => Number(v) / 1e6;
+/** Parse a user-entered USDC string to atomic units; null if not a positive finite number. */
+export const usdcAtomicOrNull = (usdc: number): bigint | null =>
+  Number.isFinite(usdc) && usdc > 0 ? usdcAtomic(usdc) : null;

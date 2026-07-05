@@ -12,6 +12,7 @@ import { applyOutcome } from "./reputation";
 const LEASE_MS = 120_000; // a 'validating' row older than this is a dead attempt — reclaimable
 
 const vaultViewAbi = parseAbi(["function refunded(bytes32 matchId) view returns (uint256)"]);
+const stakeViewAbi = parseAbi(["function slashed_for(bytes32 matchId) view returns (uint256)"]);
 const pub = createPublicClient({
   chain: arcTestnet,
   transport: http(process.env.RPC ?? undefined, { timeout: 15_000, retryCount: 3, retryDelay: 200 }),
@@ -25,13 +26,12 @@ async function alreadyRefunded(matchKey: Hex): Promise<boolean> {
   return v > 0n;
 }
 
-/** Swallow only "already done" reverts; rethrow real failures. */
-async function idempotent(label: string, fn: () => Promise<string>): Promise<string | null> {
-  try { return await fn(); } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (/not open|already|reverted/i.test(msg)) { console.warn(`[settle] ${label}: treated as done (${msg.slice(0, 80)})`); return null; }
-    throw e;
-  }
+async function alreadySlashed(matchKey: Hex): Promise<boolean> {
+  const v = await pub.readContract({
+    address: process.env.PROVIDER_STAKE_ADDRESS as Address,
+    abi: stakeViewAbi, functionName: "slashed_for", args: [matchKey],
+  });
+  return v > 0n;
 }
 
 /** Best-effort ERC-8004 + reputation tail. Money-free and idempotent — each step is guarded by its
@@ -110,11 +110,15 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
         else txs.slash_tx = await slashBond(matchKey);
       } // 2/3/4 → that step already happened (or timeout beat us) — continue to the still-owed steps
       if (!v.pass) {
-        txs.stake_slash_tx = await idempotent("stake-slash", () =>
-          slashProviderStake(matchKey, provider.wallet_address as Address, (quote.requester_wallet ?? m.requester_wallet) as Address, Number(m.bond_usdc)));
+        const requester = (quote.requester_wallet ?? m.requester_wallet) as Address;
+        // On-chain state, not string-matching, decides "already done" — immune to revert-message
+        // drift and can't misclassify a genuine failure (exhausted vault float, misconfig, transient
+        // RPC error) as done. A real failure now throws → outer catch → settle_retry → sweep retries.
+        if (!(await alreadySlashed(matchKey))) {
+          txs.stake_slash_tx = await slashProviderStake(matchKey, provider.wallet_address as Address, requester, Number(m.bond_usdc));
+        }
         if (!(await alreadyRefunded(matchKey))) {
-          txs.refund_tx = await idempotent("vault-refund", () =>
-            refundFromTreasury(matchKey, (quote.requester_wallet ?? m.requester_wallet) as Address, Number(m.price_usdc)));
+          txs.refund_tx = await refundFromTreasury(matchKey, requester, Number(m.price_usdc));
         }
       }
     }

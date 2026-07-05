@@ -4,7 +4,9 @@ import { rateLimit } from "./ratelimit-core";
 export { rateLimit };
 
 export function clientIp(req: NextRequest): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "unknown";
+  // x-real-ip is set by the Vercel edge to the true client IP (single value, not client-appendable);
+  // prefer it over the client-prependable leftmost x-forwarded-for token.
+  return req.headers.get("x-real-ip")?.trim() ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
 /** Returns a 429 response if over-limit, else null. */

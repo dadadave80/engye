@@ -48,35 +48,48 @@ export async function provisionPasskeyAccount(key: SerializedKey, credentialId: 
   const { pub, wallet } = relayer();
   const u = privateKeyToAccount(generatePrivateKey());
 
-  // 1. delegate u → IthacaAccount (u authorizes; relayer submits + pays gas)
-  const authNonce = await pub.getTransactionCount({ address: u.address });
-  const authorization = await u.signAuthorization({ contractAddress: ITHACA_IMPL, chainId: arcTestnet.id, nonce: authNonce });
-  const delegateHash = await wallet.sendTransaction({ to: u.address, value: 0n, data: "0x", authorizationList: [authorization] });
-  await pub.waitForTransactionReceipt({ hash: delegateHash });
-
-  // 2. authorize the passkey (Porto's serialized Key) as super-admin, signed by u (raw-ECDSA root branch)
-  const authorizeKey = { expiry: key.expiry, keyType: key.keyType, isSuperAdmin: key.isSuperAdmin, publicKey: key.publicKey };
-  const calls: Call[] = [{ to: u.address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [authorizeKey] }) }];
-  const nonce = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
-  const digest = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
-  const sig = await u.sign({ hash: digest });
-  const executionData = packExecutionData(calls, nonce, sig);
-  const authorizeHash = await wallet.writeContract({ address: u.address, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });
-  await pub.waitForTransactionReceipt({ hash: authorizeHash });
-
-  // 3. sponsor a little USDC so the demo stake works (the account, not gas, needs USDC to stake)
-  try {
-    const sponsorHash = await wallet.writeContract({ address: USDC, abi: erc20Abi, functionName: "transfer", args: [u.address, DEMO_STAKE_SPONSOR] });
-    await pub.waitForTransactionReceipt({ hash: sponsorHash });
-  } catch (e) {
-    console.warn("[passkey] demo USDC sponsor skipped:", e instanceof Error ? e.message : e);
-  }
-
-  // 4. persist mapping (account lowercased for case-stable lookups); u's key is discarded
-  const { error } = await supabaseAdmin.from("passkey_accounts").insert({
+  // CLAIM before spending: the credential_id PK makes a concurrent duplicate lose here, pre-spend.
+  const { error: claimErr } = await supabaseAdmin.from("passkey_accounts").insert({
     credential_id: credentialId, account: u.address.toLowerCase(), pub_x: key.publicKey.slice(0, 66), pub_y: "0x" + key.publicKey.slice(66),
   });
-  if (error) throw new Error(`passkey account persist failed: ${error.message}`);
+  if (claimErr) {
+    // someone else is provisioning this credential (or already did) — do NOT spend; return the existing account
+    const { data: won } = await supabaseAdmin.from("passkey_accounts").select("account").eq("credential_id", credentialId).maybeSingle();
+    if (won?.account) return won.account as Address;
+    throw new Error(`provision claim failed: ${claimErr.message}`);
+  }
+
+  try {
+    // 1. delegate u → IthacaAccount (u authorizes; relayer submits + pays gas)
+    const authNonce = await pub.getTransactionCount({ address: u.address });
+    const authorization = await u.signAuthorization({ contractAddress: ITHACA_IMPL, chainId: arcTestnet.id, nonce: authNonce });
+    const delegateHash = await wallet.sendTransaction({ to: u.address, value: 0n, data: "0x", authorizationList: [authorization] });
+    await pub.waitForTransactionReceipt({ hash: delegateHash });
+
+    // 2. authorize the passkey (Porto's serialized Key) as super-admin, signed by u (raw-ECDSA root branch)
+    const authorizeKey = { expiry: key.expiry, keyType: key.keyType, isSuperAdmin: key.isSuperAdmin, publicKey: key.publicKey };
+    const calls: Call[] = [{ to: u.address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [authorizeKey] }) }];
+    const nonce = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "getNonce", args: [0n] });
+    const digest = await pub.readContract({ address: u.address, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
+    const sig = await u.sign({ hash: digest });
+    const executionData = packExecutionData(calls, nonce, sig);
+    const authorizeHash = await wallet.writeContract({ address: u.address, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData] });
+    await pub.waitForTransactionReceipt({ hash: authorizeHash });
+
+    // 3. sponsor a little USDC so the demo stake works (the account, not gas, needs USDC to stake)
+    try {
+      const sponsorHash = await wallet.writeContract({ address: USDC, abi: erc20Abi, functionName: "transfer", args: [u.address, DEMO_STAKE_SPONSOR] });
+      await pub.waitForTransactionReceipt({ hash: sponsorHash });
+    } catch (e) {
+      console.warn("[passkey] demo USDC sponsor skipped:", e instanceof Error ? e.message : e);
+    }
+  } catch (e) {
+    // best-effort release so a genuine retry isn't deadlocked (same trade-off as app/api/passkey/pay/route.ts:90-96:
+    // if the delegate tx actually landed, a retry re-delegates — accepted on testnet sub-cent amounts)
+    await supabaseAdmin.from("passkey_accounts").delete().eq("credential_id", credentialId).eq("account", u.address.toLowerCase());
+    throw e;
+  }
+  // u's key is discarded (non-custodial); the claim inserted above IS the persisted mapping
   return u.address;
 }
 
@@ -86,6 +99,9 @@ export async function relayPasskeyExecute(account: Address, executionData: Hex):
   const { data: known } = await supabaseAdmin.from("passkey_accounts").select("account").eq("account", account.toLowerCase()).maybeSingle();
   if (!known) throw new Error("unknown passkey account");
   const { pub, wallet } = relayer();
+  // simulate first: reject a reverting intent before paying gas (re-adds the P256-verify simulation the
+  // fixed-gas path skips for latency — worth it on an unauthenticated relay surface)
+  await pub.simulateContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData], account: wallet.account });
   // fixed gas skips eth_estimateGas — expensive here because the node simulates the passkey's
   // P256 verify (~330k). 1.5M covers P256 verify + the batched calls with headroom.
   const hash = await wallet.writeContract({ address: account, abi: ithacaAbi, functionName: "execute", args: [ERC7821_MODE, executionData], gas: 1_500_000n });

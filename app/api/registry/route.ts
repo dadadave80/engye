@@ -7,6 +7,7 @@ import { quotePrice, payEndpoint, ensureGatewayFloat } from "@/lib/x402";
 import { validateDeliverable } from "@/lib/validator";
 import { assertPublicHttpsUrl } from "@/lib/ssrf";
 import { limited } from "@/lib/ratelimit";
+import { usdcBalance } from "@/lib/escrow";
 
 export const maxDuration = 60;
 
@@ -25,6 +26,9 @@ const PROBE_TASK = {
   type: "question-answering",
   spec: "Registry probe: what is 17 + 25? Reply with the number and one short sentence.",
 };
+
+const PROBE_MAX_USDC = Number(process.env.PROBE_MAX_USDC ?? 0.02); // hard ceiling on treasury spent per probe
+const MIN_TREASURY_USDC = 1.0; // mirror lib/broker.ts circuit-breaker floor
 
 export async function GET(): Promise<NextResponse> {
   if (!supabaseAdmin) return NextResponse.json({ error: "persistence unavailable" }, { status: 503 });
@@ -47,6 +51,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const p = parsed.data;
 
+  if (p.price_usdc > PROBE_MAX_USDC) {
+    return NextResponse.json(
+      { error: "price too high", detail: `probe price is capped at $${PROBE_MAX_USDC}; contact ENGYE for higher-priced onboarding` },
+      { status: 422 },
+    );
+  }
+
   // SSRF guard: reject before any server-side request to the submitted URL
   try {
     await assertPublicHttpsUrl(p.endpoint_url);
@@ -55,6 +66,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { error: "endpoint rejected", detail: e instanceof Error ? e.message : "invalid endpoint" },
       { status: 422 },
     );
+  }
+
+  // already-registered: metadata-only update — never re-run the paid probe for a URL we've already probed
+  const { data: existing } = await supabaseAdmin
+    .from("providers").select("id").eq("endpoint_url", p.endpoint_url).maybeSingle();
+  if (existing) {
+    await supabaseAdmin.from("providers").update({
+      name: p.name, capabilities: p.capabilities, description: p.description ?? null,
+      wallet_address: p.wallet_address, agent_card_url: p.agent_card_url ?? null, agent_id: p.agent_id ?? null,
+    }).eq("id", existing.id);
+    return NextResponse.json({ provider_id: existing.id, updated: true }, { status: 200 });
   }
 
   try {
@@ -66,7 +88,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         { status: 422 },
       );
     }
-    // 2) one real paid probe call (ENGYE treasury pays)
+    // 2) one real paid probe call (ENGYE treasury pays) — gated on a healthy treasury float
+    const bal = await usdcBalance(process.env.BROKER_ADDRESS as `0x${string}`);
+    if (bal < MIN_TREASURY_USDC + p.price_usdc) {
+      return NextResponse.json({ error: "onboarding paused", detail: "treasury below safety floor — try later" }, { status: 503 });
+    }
     await ensureGatewayFloat(process.env.BROKER_PRIVATE_KEY!);
     const { result } = await payEndpoint(p.endpoint_url, p.price_usdc, process.env.BROKER_PRIVATE_KEY!, {
       method: "POST",

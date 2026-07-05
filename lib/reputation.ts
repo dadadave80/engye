@@ -69,24 +69,14 @@ export async function applyOutcome(opts: {
   onchainTx?: string;
 }) {
   if (!supabaseAdmin) return;
-  const { data: p } = await supabaseAdmin
-    .from("providers")
-    .select("trials,passes,avg_score,avg_latency_ms,total_earned_usdc,slashes_caused")
-    .eq("id", opts.providerId)
-    .single();
-  if (!p) return;
-  const trials = p.trials + 1;
-  await supabaseAdmin
-    .from("providers")
-    .update({
-      trials,
-      passes: p.passes + (opts.pass ? 1 : 0),
-      avg_score: ((p.avg_score ?? 0) * p.trials + opts.score) / trials,
-      avg_latency_ms: ((p.avg_latency_ms ?? 0) * p.trials + opts.latencyMs) / trials,
-      total_earned_usdc: Number(p.total_earned_usdc) + opts.earnedUsdc,
-      slashes_caused: p.slashes_caused + (opts.pass ? 0 : 1),
-    })
-    .eq("id", opts.providerId);
+  const { error } = await supabaseAdmin.rpc("apply_outcome", {
+    p_provider_id: opts.providerId,
+    p_pass: opts.pass,
+    p_score: opts.score,
+    p_latency: opts.latencyMs,
+    p_earned: opts.earnedUsdc,
+  });
+  if (error) throw new Error(`apply_outcome: ${error.message}`);
   await supabaseAdmin.from("reputation_events").insert({
     provider_id: opts.providerId,
     match_id: opts.matchId,

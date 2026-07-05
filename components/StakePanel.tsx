@@ -7,7 +7,7 @@ import { Card, Button, Input, Eyebrow } from "./ui/primitives";
 import { ConnectButton } from "./wallet/ConnectButton";
 import { useAccountActions } from "./wallet/useAccountActions";
 import {
-  publicClient, PROVIDER_STAKE, USDC, erc20Abi, providerStakeAbi, usdcAtomic, fromAtomic, ARCSCAN,
+  publicClient, PROVIDER_STAKE, USDC, erc20Abi, providerStakeAbi, usdcAtomicOrNull, fromAtomic, ARCSCAN,
 } from "@/lib/clientChain";
 import type { Call } from "@/lib/ithaca";
 
@@ -57,14 +57,20 @@ export function StakePanel() {
     ({ to, value: 0n, data: encodeFunctionData({ abi, functionName: fn, args: args as never }) });
 
   async function stake() {
-    const atomic = usdcAtomic(Number(amount));
-    if (atomic <= 0n) return;
+    const atomic = usdcAtomicOrNull(Number(amount));
+    if (atomic === null) { setMsg({ text: "Enter a valid amount", err: true }); return; }
     // approve + stake — one batched passkey intent, or two sequential EOA txs
     await run("Stake", [
       call(USDC, erc20Abi, "approve", [PROVIDER_STAKE, atomic]),
       call(PROVIDER_STAKE, providerStakeAbi, "stake", [atomic]),
     ]);
     setAmount("");
+  }
+
+  async function requestUnstake() {
+    const atomic = usdcAtomicOrNull(Number(amount));
+    if (atomic === null) { setMsg({ text: "Enter a valid amount", err: true }); return; }
+    await run("Unstake request", [call(PROVIDER_STAKE, providerStakeAbi, "request_unstake", [atomic])]);
   }
 
   if (!wallet.connected) {
@@ -100,8 +106,7 @@ export function StakePanel() {
           <Button disabled={busy !== null || !amount} onClick={stake}>{busy === "Stake" ? "Staking…" : "Stake"}</Button>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
-          <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount}
-            onClick={() => run("Unstake request", [call(PROVIDER_STAKE, providerStakeAbi, "request_unstake", [usdcAtomic(Number(amount))])])}>
+          <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount} onClick={requestUnstake}>
             Request Unstake
           </Button>
           <Button variant="outline" size="sm" disabled={busy !== null || !canWithdraw}

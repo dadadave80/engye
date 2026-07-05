@@ -64,7 +64,8 @@ export async function registerAgent(walletPk: string, agentURI: string): Promise
     account,
   });
   const hash = await wallet.writeContract(request);
-  await pub.waitForTransactionReceipt({ hash });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`registerAgent reverted: ${hash}`);
   return result;
 }
 
@@ -95,7 +96,8 @@ export async function giveFeedback(opts: {
     ],
     account,
   });
-  await pub.waitForTransactionReceipt({ hash });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`giveFeedback reverted: ${hash}`);
   return hash;
 }
 
@@ -118,7 +120,8 @@ export async function requestValidation(opts: {
     args: [validator as Address, opts.providerAgentId, opts.requestURI, opts.matchKey],
     account,
   });
-  await pub.waitForTransactionReceipt({ hash });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`validationRequest reverted: ${hash}`);
   return hash;
 }
 
@@ -146,7 +149,8 @@ export async function respondValidation(opts: {
     ],
     account,
   });
-  await pub.waitForTransactionReceipt({ hash });
+  const receipt = await pub.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") throw new Error(`validationResponse reverted: ${hash}`);
   return hash;
 }
 
