@@ -2,6 +2,7 @@ import { defineTool } from "eve/tools";
 import { z } from "zod";
 import { quoteTask } from "../../lib/broker";
 import { rateLimit } from "../../lib/ratelimit-core";
+import { fetchPageText, fenceUntrusted } from "../../lib/ingest";
 
 export default defineTool({
   description:
@@ -16,7 +17,14 @@ export default defineTool({
     if (!rateLimit(`quote:${ctx.session.id}`, 20, 60_000)) {
       return { error: "rate limited — try again in a minute" };
     }
-    if (url) return { error: "URL ingestion lands later today — ask the user to paste the content for now" };
-    return quoteTask({ type: task_type, spec, max_price_usdc }, null);
+    let fullSpec = spec;
+    if (url) {
+      try {
+        fullSpec = `${spec}\n\n${fenceUntrusted(await fetchPageText(url))}`;
+      } catch (e) {
+        return { error: `could not fetch that URL: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    }
+    return quoteTask({ type: task_type, spec: fullSpec, max_price_usdc }, null);
   },
 });

@@ -5,7 +5,8 @@ import { workTask } from "@/lib/inhouse";
 
 async function handler(req: NextRequest): Promise<NextResponse> {
   const task = await req.json().catch(() => ({}));
-  const deliverable = await workTask(task, "answer");
+  const mode = task?.type === "extract" ? "extract" : "answer";
+  const deliverable = await workTask(task, mode);
   return NextResponse.json({ provider: "engye-inhouse-quote", data: deliverable, ...deliverable });
 }
 
