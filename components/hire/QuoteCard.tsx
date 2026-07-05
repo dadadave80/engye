@@ -40,6 +40,20 @@ type ExecuteResult = {
   verdict_due_at?: string; watch_url?: string; bond_tx?: string; tier?: string;
 };
 
+/* Render a deliverable readably. Providers return { provider, answer } — show the `answer` as prose;
+   if it's itself JSON (e.g. the sidecar's settlement statement) pretty-print that; else raw JSON. */
+function Deliverable({ value }: { value: unknown }) {
+  const box: CSSProperties = { margin: "14px 0 0", padding: 12, background: "var(--muted)", borderRadius: "var(--radius)", fontSize: 12.5, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" };
+  const answer = value && typeof value === "object" && "answer" in value && typeof (value as { answer?: unknown }).answer === "string"
+    ? (value as { answer: string }).answer : undefined;
+  if (answer !== undefined) {
+    let pretty: string | null = null;
+    try { const p = JSON.parse(answer); if (p && typeof p === "object") pretty = JSON.stringify(p, null, 2); } catch { /* prose */ }
+    return <pre style={{ ...box, fontFamily: pretty ? "var(--font-mono)" : "var(--font-body)", lineHeight: 1.55 }}>{pretty ?? answer}</pre>;
+  }
+  return <pre style={{ ...box }}>{JSON.stringify(value, null, 2)}</pre>;
+}
+
 export function QuoteCard({ output }: { output: Record<string, unknown> }) {
   const wallet = useWallet();
   const { current } = usePasskey();
@@ -123,11 +137,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
               </div>
             ))}
           </div>
-          {result.deliverable !== undefined && (
-            <pre style={{ margin: "14px 0 0", padding: 12, background: "var(--muted)", borderRadius: "var(--radius)", fontSize: 12, maxHeight: 260, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-              {JSON.stringify(result.deliverable, null, 2)}
-            </pre>
-          )}
+          {result.deliverable !== undefined && <Deliverable value={result.deliverable} />}
           <div style={{ marginTop: 14 }}>
             {result.status === "delivered_awaiting_verdict" && result.verdict_due_at
               ? <VerdictWatch matchKey={result.match_key} dueAt={result.verdict_due_at} bondTx={result.bond_tx} />
