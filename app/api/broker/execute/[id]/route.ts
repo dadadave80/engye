@@ -40,10 +40,23 @@ export async function POST(
   const { data: provider } = await supabaseAdmin.from("providers").select("*").eq("id", quote.provider_id).single();
   if (!provider) return NextResponse.json({ error: "provider missing" }, { status: 500 });
 
-  // rail A inbound: requester pays ENGYE the quoted total
+  // rail A inbound: requester pays ENGYE the quoted total (x402) OR a passkey account pays by a
+  // relay-bound direct transfer (spec §5) proven via x-engye-payment-tx.
   const endpoint = `/api/broker/execute/${id}`;
   const requirements = buildRequirements(Number(quote.total_price_usdc), process.env.BROKER_ADDRESS!);
-  if (!req.headers.get("payment-signature")) return paymentRequired(endpoint, requirements);
+  const proofTx = req.headers.get("x-engye-payment-tx");
+  let paidBy: string | null = null;
+  if (proofTx) {
+    // passkey rail: honor only a proof row bound to THIS quote at relay time (spec §5)
+    const { data: proof } = await supabaseAdmin
+      .from("payments").select("payer,quote_id").eq("gateway_tx", proofTx).eq("direction", "inbound").maybeSingle();
+    if (!proof || proof.quote_id !== id) {
+      return NextResponse.json({ error: "no payment bound to this quote for that tx" }, { status: 402 });
+    }
+    paidBy = proof.payer;
+  } else if (!req.headers.get("payment-signature")) {
+    return paymentRequired(endpoint, requirements);
+  }
 
   // atomic claim BEFORE taking payment — a concurrent retry of the same quote can't double-execute
   // (conditional update: only the request that flips open→executing proceeds).
@@ -53,13 +66,15 @@ export async function POST(
     return NextResponse.json({ error: "quote already claimed, executed, or expired" }, { status: 409 });
   }
 
-  const paid = await verifyAndSettle(req, requirements, endpoint, "inbound");
-  if (!paid.ok) {
-    await supabaseAdmin.from("quotes").update({ status: "open" }).eq("id", id); // release for retry
-    return NextResponse.json({ error: paid.error }, { status: paid.status });
+  if (!paidBy) {
+    const paid = await verifyAndSettle(req, requirements, endpoint, "inbound");
+    if (!paid.ok) {
+      await supabaseAdmin.from("quotes").update({ status: "open" }).eq("id", id); // release for retry
+      return NextResponse.json({ error: paid.error }, { status: paid.status });
+    }
+    paidBy = paid.payer;
   }
-
-  const requester = (quote.requester_wallet ?? paid.payer) as Address;
+  const requester = (quote.requester_wallet ?? paidBy) as Address;
   const bonded = quote.action === "accept";
   const matchKey = keccak256(toBytes(`${id}:${Date.now()}`)) as Hex;
   const startedAt = Date.now();
