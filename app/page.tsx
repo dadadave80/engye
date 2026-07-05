@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Eyebrow, Card, Button, AddressChip } from "@/components/ui/primitives";
 import { GravityStars } from "@/components/ui/GravityStars";
 import { CountUp } from "@/components/ui/CountUp";
+import { LandingHeader } from "@/components/LandingHeader";
 import { getTotals, getFeed } from "@/lib/queries";
-import { supabasePublic } from "@/lib/supabase/public";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,30 +20,15 @@ const STATIONS = [
 ];
 
 export default async function Landing() {
-  const [totals, feed, { count: liveCount }] = await Promise.all([
-    getTotals(),
-    getFeed(1),
-    supabasePublic().from("matches").select("id", { count: "exact", head: true }).in("status", ["awaiting_verdict", "validating", "settle_retry"]),
-  ]);
+  const [totals, feed] = await Promise.all([getTotals(), getFeed(1)]);
   const lastBondTx = feed[0]?.tx ?? null;
 
   return (
     <div style={{ background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", minHeight: "100vh" }}>
-      {/* S0 — pencil bar */}
-      <div style={{ minHeight: 32, display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 8, padding: "6px 16px", textAlign: "center", boxSizing: "border-box", background: "color-mix(in oklab, var(--gold) 10%, var(--marble))", fontSize: 13, ...mono }}>
-        {liveCount ? (
-          <>
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--laurel)", flexShrink: 0 }} />
-            {liveCount} match{liveCount === 1 ? "" : "es"} awaiting verdict
-          </>
-        ) : (
-          <>Live on Arc testnet — {totals.matchesSettled.toLocaleString()} matches settled</>
-        )}
-        <Link href="/agora" style={{ color: "var(--link)" }}>Enter the Agora →</Link>
-      </div>
+      <LandingHeader settled={totals.matchesSettled} />
 
       {/* S1 — hero */}
-      <section className="section-pad" style={{ position: "relative", overflow: "hidden" }}>
+      <section id="hero" className="section-pad" style={{ position: "relative", overflow: "hidden" }}>
         <GravityStars color="var(--gold)" starsOpacity={0.45} />
         <div className="container r-hero" style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
