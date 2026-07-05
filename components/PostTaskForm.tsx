@@ -116,7 +116,11 @@ export function PostTaskForm() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <Badge status="OPEN" label="delivered" />
-              <span style={{ fontSize: 15, fontWeight: 600 }}>Delivered — opening your match page…</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>
+                {result.status === "delivered_awaiting_verdict"
+                  ? "Delivered — opening your match page to watch the verdict…"
+                  : "Delivered — opening your match page…"}
+              </span>
             </div>
             {result.bond_tx ? (
               <a href={`${ARCSCAN}/tx/${result.bond_tx}`} target="_blank" rel="noreferrer" style={{ color: "var(--link)", ...mono, fontSize: 13 }}>bond: {(result.bond_tx as string).slice(0, 10)}…</a>

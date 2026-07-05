@@ -14,6 +14,12 @@ export default defineTool({
     max_price_usdc: z.number().positive().max(1).default(0.05),
   }),
   async execute({ task_type, spec, url, max_price_usdc }, ctx) {
+    // The eve channel is public and the tool ctx can't see the caller IP, so per-session limiting
+    // alone doesn't bound total LLM spend (an attacker just opens more sessions). A global cap on
+    // quote volume across ALL sessions is the real cost-DoS backstop, on top of the per-session limit.
+    if (!rateLimit("quote:global", 60, 60_000)) {
+      return { error: "the broker is fielding a lot of requests right now — try again in a moment" };
+    }
     if (!rateLimit(`quote:${ctx.session.id}`, 20, 60_000)) {
       return { error: "rate limited — try again in a minute" };
     }

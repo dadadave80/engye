@@ -3,7 +3,7 @@
 // live matches inside their verdict window, and a feed of recent terminal verdicts.
 // Realtime idiom copied verbatim from components/LiveFeed.tsx (inline browser client,
 // postgres_changes on `matches`, re-hydrate via the joined select — payloads carry no joins).
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { Card, Badge, Eyebrow, EmptyState } from "../ui/primitives";
@@ -82,7 +82,9 @@ function LiveCard({ m, now }: { m: LiveMatch; now: number }) {
   );
 }
 
-function VerdictRowView({ r, fresh }: { r: VerdictRow; fresh: boolean }) {
+// memoized: the feed doesn't depend on the 1s countdown tick that re-renders Floor, so a row only
+// re-renders when its own data or fresh flag changes (LiveCards genuinely need the tick, so aren't memoized).
+const VerdictRowView = memo(function VerdictRowView({ r, fresh }: { r: VerdictRow; fresh: boolean }) {
   const href = txUrl(r.tx);
   return (
     <div
@@ -102,7 +104,7 @@ function VerdictRowView({ r, fresh }: { r: VerdictRow; fresh: boolean }) {
       <span style={{ fontSize: 12, color: "var(--muted-foreground)", ...mono, whiteSpace: "nowrap" }}>{rel(r.at)}</span>
     </div>
   );
-}
+});
 
 export function Floor({ initialLive, initialFeed }: { initialLive: LiveMatch[]; initialFeed: VerdictRow[] }) {
   const [live, setLive] = useState<LiveMatch[]>(initialLive);
