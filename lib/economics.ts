@@ -6,6 +6,7 @@ export const MAX_BOND = Number(process.env.MAX_BOND ?? 0.25);
 export const RISK_MARGIN = Number(process.env.RISK_MARGIN ?? 1.0);
 export const MIN_FEE = 0.0005;
 export const MATCH_TTL_SECONDS = 600; // bond deadline; > full lifecycle, < stake cooldown (1h)
+export const VERDICT_WINDOW_SECONDS = Number(process.env.VERDICT_WINDOW_SECONDS ?? 120); // odds/verdict window (spec 2026-07-04)
 export const QUOTE_TTL_MS = 10 * 60 * 1000;
 export const BEST_EFFORT_FEE_DISCOUNT = 0.5;
 
