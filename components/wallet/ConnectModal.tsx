@@ -33,7 +33,10 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
       addAccount(s); // becomes current
       onClose();
     } catch (e) {
-      setErr(e instanceof Error ? e.message.split("\n")[0] : String(e));
+      // ox wraps WebAuthn failures in a generic 'Failed to create credential.' — surface the cause
+      const cause = (e as { cause?: { message?: string } })?.cause?.message?.split("\n")[0];
+      const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
+      setErr(cause && cause !== msg ? `${msg} (${cause})` : msg);
     } finally { setBusy(false); }
   }
 
