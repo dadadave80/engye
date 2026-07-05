@@ -29,6 +29,7 @@ const identityAbi = parseAbi([
   "function register(string agentURI) returns (uint256)",
   "function getAgentWallet(uint256 agentId) view returns (address)",
   "function ownerOf(uint256 tokenId) view returns (address)",
+  "function tokenURI(uint256 tokenId) view returns (string)",
 ]);
 
 const reputationAbi = parseAbi([
@@ -152,6 +153,30 @@ export async function respondValidation(opts: {
   const receipt = await pub.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error(`validationResponse reverted: ${hash}`);
   return hash;
+}
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+
+/** On-chain identity of an ERC-8004 agent: owner, payout wallet (falls back to owner when unset),
+ *  and the agent-card URI. Throws if the agentId doesn't exist. View calls only — no keys, no gas. */
+export async function readAgentIdentity(agentId: bigint): Promise<{ owner: Address; wallet: Address; uri: string }> {
+  const transport = http(process.env.RPC ?? undefined);
+  const pub = createPublicClient({ chain: arcTestnet, transport });
+  const [owner, uri] = await Promise.all([
+    pub.readContract({ address: IDENTITY, abi: identityAbi, functionName: "ownerOf", args: [agentId] }),
+    pub.readContract({ address: IDENTITY, abi: identityAbi, functionName: "tokenURI", args: [agentId] }),
+  ]);
+  const wallet = await pub
+    .readContract({ address: IDENTITY, abi: identityAbi, functionName: "getAgentWallet", args: [agentId] })
+    .catch(() => ZERO as Address);
+  return { owner, wallet: wallet === ZERO ? owner : wallet, uri };
+}
+
+/** True iff `claimed` is the agent's on-chain wallet or owner (registration identity check). */
+export async function verifyAgentWallet(agentId: bigint, claimed: string): Promise<boolean> {
+  const { owner, wallet } = await readAgentIdentity(agentId);
+  const c = claimed.toLowerCase();
+  return c === owner.toLowerCase() || c === wallet.toLowerCase();
 }
 
 export async function getValidationStatus(matchKey: Hex) {

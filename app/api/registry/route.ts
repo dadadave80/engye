@@ -1,5 +1,8 @@
 // Provider registry: POST = register + probe (well-formed 402 → one real paid call →
 // validator-scored reputation prior). GET = public list.
+// ERC-8004 integration: a claimed agent_id is verified against the on-chain Identity registry
+// (wallet must be the agent's wallet/owner), and POST {agent_id} alone imports the agent —
+// card read from tokenURI, endpoint from the card, payout wallet from the chain.
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/db";
@@ -8,6 +11,8 @@ import { validateDeliverable } from "@/lib/validator";
 import { assertPublicHttpsUrl } from "@/lib/ssrf";
 import { limited } from "@/lib/ratelimit";
 import { usdcBalance } from "@/lib/escrow";
+import { readAgentIdentity, verifyAgentWallet } from "@/lib/erc8004";
+import { parseAgentCard } from "@/lib/agentCard";
 
 export const maxDuration = 60;
 
@@ -40,16 +45,72 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ providers: data ?? [] });
 }
 
+// import-by-agentId: the whole registration derived from the ERC-8004 identity on-chain
+const importSchema = z.object({ agent_id: z.number().int().positive() }).strict();
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!supabaseAdmin) return NextResponse.json({ error: "persistence unavailable" }, { status: 503 });
   // strict: each probe spends real treasury USDC paying the endpoint — 5/hour/IP
   const rl = limited(req, "registry", 5, 3_600_000);
   if (rl) return rl;
-  const parsed = registerSchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
+  const body = await req.json().catch(() => null);
+
+  // ---- import mode: POST {agent_id} — everything else comes from the chain + agent card ----
+  const imp = importSchema.safeParse(body);
+  let p: z.infer<typeof registerSchema>;
+  if (imp.success) {
+    const agentId = BigInt(imp.data.agent_id);
+    let identity: Awaited<ReturnType<typeof readAgentIdentity>>;
+    try {
+      identity = await readAgentIdentity(agentId);
+    } catch {
+      return NextResponse.json({ error: "unknown agent", detail: `agent #${imp.data.agent_id} not found in the ERC-8004 Identity registry` }, { status: 422 });
+    }
+    try {
+      await assertPublicHttpsUrl(identity.uri);
+    } catch {
+      return NextResponse.json({ error: "bad agent card", detail: "agent tokenURI is not a public https URL" }, { status: 422 });
+    }
+    const cardRes = await fetch(identity.uri, { signal: AbortSignal.timeout(10_000) }).catch(() => null);
+    const cardJson = cardRes?.ok ? await cardRes.json().catch(() => null) : null;
+    const card = cardJson ? parseAgentCard(cardJson, identity.uri, agentId) : null;
+    if (!card) {
+      return NextResponse.json({ error: "bad agent card", detail: "card unreachable, malformed, or missing an https endpoints.service" }, { status: 422 });
+    }
+    // price is whatever the endpoint's own 402 advertises (still probe-capped below)
+    let advertised: number;
+    try {
+      advertised = await quotePrice(card.endpoint, { method: "POST", body: JSON.stringify(PROBE_TASK) });
+    } catch {
+      return NextResponse.json({ error: "probe failed", detail: "endpoint did not answer a well-formed 402" }, { status: 422 });
+    }
+    p = {
+      name: card.name,
+      endpoint_url: card.endpoint,
+      price_usdc: advertised,
+      capabilities: card.capabilities,
+      description: card.description ?? undefined,
+      wallet_address: identity.wallet, // chain truth — payouts go to the agent's on-chain wallet
+      agent_card_url: identity.uri,
+      agent_id: imp.data.agent_id,
+    };
+  } else {
+    const parsed = registerSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "bad request" }, { status: 400 });
+    }
+    p = parsed.data;
+    // a claimed ERC-8004 identity must check out on-chain (wallet == agent wallet/owner)
+    if (p.agent_id) {
+      const ok = await verifyAgentWallet(BigInt(p.agent_id), p.wallet_address).catch(() => false);
+      if (!ok) {
+        return NextResponse.json(
+          { error: "identity mismatch", detail: `wallet is not the on-chain wallet/owner of ERC-8004 agent #${p.agent_id}` },
+          { status: 422 },
+        );
+      }
+    }
   }
-  const p = parsed.data;
 
   if (p.price_usdc > PROBE_MAX_USDC) {
     return NextResponse.json(

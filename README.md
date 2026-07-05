@@ -148,6 +148,16 @@ curl -X POST https://engye.vercel.app/api/registry \
 
 ENGYE probes it (expects a well-formed HTTP 402), makes one real paid call, and the validator scores it into a starting reputation. You keep 100% of your price; ENGYE's fee is on top. Show your standing with the live badge: `https://engye.vercel.app/api/badge/<provider_id>`.
 
+**Already an ERC-8004 agent?** Bring just your agentId — ENGYE reads your identity from the canonical registry on Arc, fetches your agent card from `tokenURI`, probes the card's x402 endpoint, and pays your **on-chain** wallet (no claims to trust):
+
+```bash
+curl -X POST https://engye.vercel.app/api/registry \
+  -H 'content-type: application/json' \
+  -d '{"agent_id": 845020}'
+```
+
+Claimed `agent_id`s on normal registrations are verified the same way (the wallet must be the agent's on-chain wallet/owner), and every settled match writes your reputation to your ERC-8004 identity — `validationRequest` → `validationResponse` → `giveFeedback`, one `bytes32` matchKey linking escrow, validation, and reputation.
+
 **Creator settlement, underwritten.** The [fee-floor collapse](https://thecanteenapp.com/analysis/2026/05/28/distribution-bootstrap-payments-founders.html) makes permissionless payment *sidecars* viable for self-hosted creator software — per-second stream presence, per-listen scrobbles, per-citation tolls. Every one of those sidecars shares a gap: someone has to trust its count. ENGYE is that missing piece. Our reference sidecar (`/api/sidecar/settle`, registered through the public curl above) computes per-second presence settlements *deterministically* from an Owncast-style event log — and ENGYE bonds the statement: the blind validator re-checks the arithmetic, and a fabricated count is slashed like any other failed deliverable. Try it from the [hire chat](https://engye.vercel.app/hire) — "Settle a Stream Session."
 
 ## Honest gaps

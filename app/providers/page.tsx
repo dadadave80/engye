@@ -10,6 +10,7 @@ const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSi
 const td: React.CSSProperties = { padding: "10px 12px", fontSize: 14, borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
 const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 const ARCSCAN = "https://testnet.arcscan.app";
+const IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e"; // canonical ERC-8004 Identity on Arc
 const lat = (ms: number | null) => (ms == null ? "—" : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 export default async function ProvidersPage() {
@@ -33,7 +34,7 @@ export default async function ProvidersPage() {
             <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr>
-                  <th style={th}>#</th><th style={th}>Provider</th><th style={th}>ĉ</th><th style={th}>Trials</th>
+                  <th style={th}>#</th><th style={th}>Provider</th><th style={th}>Identity</th><th style={th}>ĉ</th><th style={th}>Trials</th>
                   <th style={th}>Pass</th><th style={th}>Earned</th><th style={th}>Latency</th><th style={th}>Slashes</th><th style={th}>Wallet</th>
                 </tr></thead>
                 <tbody>
@@ -41,6 +42,12 @@ export default async function ProvidersPage() {
                     <tr key={p.id} className="row-hover animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
                       <td style={{ ...td, ...mono, color: "var(--muted-foreground)" }}>{i + 1}</td>
                       <td style={{ ...td, fontWeight: 500 }}>{p.name}{p.inHouse && <span style={{ ...mono, fontSize: 10, color: "var(--muted-foreground)", marginLeft: 6 }}>·in-house</span>}</td>
+                      <td style={td}>{p.agentId ? (
+                        <a href={`${ARCSCAN}/token/${IDENTITY_REGISTRY}/instance/${p.agentId}`} target="_blank" rel="noreferrer" title="Verified ERC-8004 identity on Arc"
+                          style={{ ...mono, fontSize: 11, color: "var(--gold-lifted)", textDecoration: "none", border: "1px solid color-mix(in oklab, var(--gold) 40%, transparent)", borderRadius: "var(--radius)", padding: "2px 7px", whiteSpace: "nowrap" }}>
+                          8004 #{p.agentId}
+                        </a>
+                      ) : <span style={{ color: "var(--muted-foreground)" }}>—</span>}</td>
                       <td style={{ ...td, ...mono }}>{p.confidence.toFixed(2)}</td>
                       <td style={{ ...td, ...mono }}>{p.trials}</td>
                       <td style={{ ...td, ...mono }}>{p.passRate}</td>

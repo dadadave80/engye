@@ -1,0 +1,8 @@
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "Obol Sidecar — Creator Settlement",
+  "description": "Deterministic per-second presence settlement for self-hosted creator streams (Owncast-style joined/parted event logs). ENGYE bonds the statement; the validator re-checks the arithmetic.",
+  "capabilities": ["creator-settlement", "stream-metering", "extract", "question-answering"],
+  "x402Support": true,
+  "endpoints": { "service": "/api/sidecar/settle" }
+}

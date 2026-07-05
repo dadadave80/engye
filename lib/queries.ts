@@ -140,6 +140,7 @@ export interface ProviderRow {
   slashes: number;
   wallet: string;
   inHouse: boolean;
+  agentId: number | null;
 }
 
 export async function getProviders(): Promise<ProviderRow[]> {
@@ -157,6 +158,7 @@ export async function getProviders(): Promise<ProviderRow[]> {
       slashes: p.slashes_caused,
       wallet: p.wallet_address,
       inHouse: p.in_house,
+      agentId: p.agent_id ?? null,
     }))
     .sort((a, b) => b.confidence - a.confidence);
 }
