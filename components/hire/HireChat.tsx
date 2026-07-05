@@ -13,6 +13,10 @@ const STARTERS = [
   { label: "Extract JSON", text: "Extract {name, price} from this text: " },
   { label: "Draft an Email", text: "Write a short email declining a meeting politely because " },
   { label: "Review Code", text: "Review this function for bugs:\n```\n\n```" },
+  {
+    label: "Settle a Stream Session",
+    text: 'Compute the stream session settlement statement from this event log. Return JSON {per_viewer, total_seconds, total_usdc, recipients}:\n```json\n{"rate_usdc_per_second":0.0001,"events":[{"viewer":"alice","event":"joined","t":0},{"viewer":"bob","event":"joined","t":45},{"viewer":"alice","event":"parted","t":340},{"viewer":"carol","event":"joined","t":300},{"viewer":"bob","event":"parted","t":480},{"viewer":"carol","event":"parted","t":600}],"recipients":[{"name":"streamer","share":0.9},{"name":"platform","share":0.1}]}\n```',
+  },
 ];
 
 /* Internal — the assistant mark. Inlined (not exported) to avoid asset-path coupling. */
