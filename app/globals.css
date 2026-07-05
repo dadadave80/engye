@@ -212,10 +212,23 @@ img, svg, video, canvas { max-width: 100%; }
 .r-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; }
 @media (max-width: 640px) { .r-footer { grid-template-columns: 1fr; gap: 24px; } }
 
-/* app header nav: scrolls horizontally when it can't fit (keeps all items reachable on a phone) */
-.r-nav { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.r-nav::-webkit-scrollbar { display: none; }
-.r-nav > * { flex-shrink: 0; white-space: nowrap; }
+/* app header nav: horizontal row on desktop, hamburger + dropdown panel under 860px */
+.nav-desktop { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.nav-desktop::-webkit-scrollbar { display: none; }
+.nav-desktop > * { flex-shrink: 0; white-space: nowrap; }
+.nav-hamburger { display: none; }
+@media (max-width: 860px) {
+  .nav-desktop { display: none; }
+  .nav-hamburger { display: inline-flex; }
+}
+.nav-panel {
+  position: absolute; top: calc(100% + 4px); right: clamp(16px, 4vw, 48px);
+  z-index: 50; min-width: 220px; max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column; gap: 2px; padding: 8px;
+  background: var(--popover); color: var(--popover-foreground);
+  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-popover);
+}
+.nav-backdrop { position: fixed; inset: 0; z-index: 40; }
 
 /* visibility helpers by width */
 @media (max-width: 520px) { .r-hide-xs { display: none !important; } }
