@@ -64,7 +64,15 @@ export async function accountFromCredential(credential: StoredCredential) {
 export async function sendCalls(credential: StoredCredential, calls: { to: Address; value: bigint; data: Hex }[]): Promise<Hex> {
   const { bundler } = clients();
   const account = await accountFromCredential(credential);
-  const userOpHash = await bundler.sendUserOperation({ account, calls, paymaster: true });
+  let userOpHash: Hex;
+  try {
+    userOpHash = await bundler.sendUserOperation({ account, calls, paymaster: true });
+  } catch (e) {
+    // AA33 = paymaster validation failed → almost always a missing/inactive Gas Station policy for Arc
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/AA33|paymaster/i.test(msg)) throw new Error("Gasless sponsorship is unavailable — the Circle Gas Station policy for Arc Testnet may not be active. " + msg);
+    throw e;
+  }
   const { receipt } = await bundler.waitForUserOperationReceipt({ hash: userOpHash });
   if (receipt.status !== "success") throw new Error("user operation reverted");
   return receipt.transactionHash;
