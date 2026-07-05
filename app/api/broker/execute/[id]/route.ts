@@ -53,6 +53,13 @@ export async function POST(
     if (!proof || proof.quote_id !== id) {
       return NextResponse.json({ error: "no payment bound to this quote for that tx" }, { status: 402 });
     }
+    // defense-in-depth: the payer must be a provisioned passkey account, not just any address that
+    // happens to match a payments row (cheap extra check on the money path).
+    const { data: passkeyAccount } = await supabaseAdmin
+      .from("passkey_accounts").select("account").eq("account", proof.payer.toLowerCase()).maybeSingle();
+    if (!passkeyAccount) {
+      return NextResponse.json({ error: "payment not from a known passkey account" }, { status: 402 });
+    }
     paidBy = proof.payer;
   } else if (!req.headers.get("payment-signature")) {
     return paymentRequired(endpoint, requirements);

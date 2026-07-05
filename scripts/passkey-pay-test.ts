@@ -2,14 +2,15 @@
 // Provisions a real headless-passkey Ithaca account (pattern-copied from recovery-onchain.ts),
 // funds it a little USDC from the broker wallet, gets a live bonded quote, then exercises the
 // full attack surface the design closes BEFORE relaying: wrong-amount, wrong-token, replay,
-// and rebind (same proof, different quote) — plus the happy path end-to-end through settlement.
+// rebind (same proof, different quote), and a concurrent double-charge on the SAME quote (review
+// fix — migration 0006's atomic claim) — plus the happy path end-to-end through settlement.
 // Run against local dev: APP_URL=http://localhost:3000 bun scripts/passkey-pay-test.ts
 import { createPublicClient, createWalletClient, http, encodeFunctionData, erc20Abi, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arcTestnet } from "viem/chains";
 import { createClient } from "@supabase/supabase-js";
 import * as Key from "porto/viem/Key";
-import { accountDigest, packExecutionData, type Call } from "../lib/ithaca";
+import { accountDigest, packExecutionData, ithacaAbi, type Call } from "../lib/ithaca";
 import { usdcAtomic } from "../lib/escrow";
 import { VERDICT_WINDOW_SECONDS } from "../lib/economics";
 
@@ -83,6 +84,22 @@ console.log(`   account = ${account}`);
 /** Passkey-sign an ERC-7821 batch for `account` (headless key already in memory — no relay). */
 async function sign(calls: Call[]): Promise<Hex> {
   const { digest, nonce } = await accountDigest(account, calls);
+  const wrapped = (await Key.sign(key, { address: null, payload: digest, wrap: true })) as Hex;
+  return packExecutionData(calls, nonce, wrapped);
+}
+
+/**
+ * Like sign(), but reads the nonce from an explicit seqKey (Ithaca's 2D nonce: getNonce(seqKey))
+ * instead of accountDigest's hardcoded seqKey=0. This mints two INDEPENDENTLY-valid intents on the
+ * same account for the concurrency test below — if we instead reused the same seqKey for both,
+ * whichever one lost the DB race would ALSO revert on-chain from nonce reuse even without the fix,
+ * which would prove nothing. Two distinct seqKeys means both intents are individually relayable,
+ * so the test genuinely exercises "the DB claim — not on-chain nonce collision — is what blocks
+ * the loser".
+ */
+async function signWithSeqKey(calls: Call[], seqKey: bigint): Promise<Hex> {
+  const nonce = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "getNonce", args: [seqKey] });
+  const digest = await pub.readContract({ address: account, abi: ithacaAbi, functionName: "computeDigest", args: [calls, nonce] });
   const wrapped = (await Key.sign(key, { address: null, payload: digest, wrap: true })) as Hex;
   return packExecutionData(calls, nonce, wrapped);
 }
@@ -191,4 +208,46 @@ if (final.status === "failed_compensated") {
   console.log(`   ✓ PASS flow: bond released (${final.settle_tx})`);
 }
 
-console.log("\npasskey pay rail ✓ (happy, wrong-amount, wrong-token, replay, rebind)");
+// ---------- 11. CONCURRENCY: two concurrent /api/passkey/pay for the SAME fresh quote ----------
+// Review fix: /api/passkey/pay used to SELECT-then-relay-then-INSERT with no DB-level exclusion,
+// so two concurrent requests for the same quote (distinct signed intents, different nonces) could
+// both pass the SELECT, both relay on-chain, and both persist — double-charging the quote. The fix
+// (migration 0006's partial unique index on payments(quote_id) where direction='inbound') claims a
+// pending row BEFORE relay; the loser's INSERT hits the unique violation and 409s pre-relay.
+console.log("11. CONCURRENCY — two concurrent pays for the same fresh quote…");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let quote3: any = null;
+for (let i = 0; i < 5; i++) {
+  quote3 = await getQuote({ type: "answer", spec: "capital of Italy? one word", max_price_usdc: 0.05 }, account);
+  if (!quote3.declined) break;
+  console.log(`   attempt ${i + 1}: declined (${quote3.reason}), retrying`);
+}
+if (!quote3 || quote3.declined) throw new Error(`could not get a third open quote: ${JSON.stringify(quote3)}`);
+console.log(`   quote_id=${quote3.quote_id} total=$${quote3.total_price_usdc}`);
+const expected3 = usdcAtomic(quote3.total_price_usdc);
+const concurrentCalls: Call[] = [{
+  to: USDC, value: 0n,
+  data: encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [BROKER, expected3] }),
+}];
+// sign both intents up front (sequentially — signing itself isn't what we're racing), THEN fire
+// both HTTP requests together so the race is on the server's claim-then-relay path, not on signing.
+const [intentA, intentB] = [await signWithSeqKey(concurrentCalls, 0n), await signWithSeqKey(concurrentCalls, 1n)];
+const [respA, respB] = await Promise.all([
+  payReq(quote3.quote_id, account, intentA),
+  payReq(quote3.quote_id, account, intentB),
+]);
+const statuses = [respA.status, respB.status].sort((a, b) => a - b);
+assert(
+  statuses[0] === 200 && statuses[1] === 409,
+  `expected exactly one 200 and one 409, got ${respA.status} & ${respB.status}: ${JSON.stringify([respA.body, respB.body])}`,
+);
+const winner = respA.status === 200 ? respA.body : respB.body;
+const loser = respA.status === 409 ? respA.body : respB.body;
+const { data: rows, error: rowsErr } = await sb
+  .from("payments").select("id,gateway_tx").eq("quote_id", quote3.quote_id).eq("direction", "inbound");
+if (rowsErr) throw new Error(`payments query failed: ${rowsErr.message}`);
+assert(rows?.length === 1, `expected exactly ONE inbound payment row for the quote, got ${rows?.length}: ${JSON.stringify(rows)}`);
+assert(rows[0].gateway_tx === winner.hash, `persisted gateway_tx ${rows[0].gateway_tx} !== winner's hash ${winner.hash}`);
+console.log(`   ✓ one 200 (${winner.hash}), one 409 (${loser.error}), exactly 1 payment row persisted (gateway_tx=${rows[0].gateway_tx})`);
+
+console.log("\npasskey pay rail ✓ (happy, wrong-amount, wrong-token, replay, rebind, concurrency)");
