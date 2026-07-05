@@ -56,7 +56,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
 
         {view === "switch" ? (
           <div style={{ padding: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Switch account</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Switch Account</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {accounts.map((a) => (
                 <button key={a.address} onClick={() => { switchTo(a.address); onClose(); }}
@@ -91,7 +91,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               <span style={mono}>{active ? `Using ${trunc(active.address)}` : "No account yet"}</span>
               <span style={{ display: "inline-flex", gap: 12 }}>
                 {accounts.length > 1 && <button style={link} onClick={() => setView("switch")}>Switch</button>}
-                <button style={link} onClick={signUp}>Sign up</button>
+                <button style={link} onClick={signUp}>Sign Up</button>
               </span>
             </div>
 
@@ -99,7 +99,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               <button onClick={() => { connect({ connector: injected() }); onClose(); }}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)" }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser wallet</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 14 }}><Wallet size={16} /> Browser Wallet</span>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-foreground)" }}>injected wallet <ChevronRight size={14} /></span>
               </button>
               <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer"

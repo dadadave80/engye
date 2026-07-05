@@ -171,7 +171,7 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
         {wallet.connected ? (
           <Button onClick={accept} disabled={busy} style={{ width: "100%", marginTop: bonded ? 4 : 14 }}>
             {passkey && <KeyRound size={15} aria-hidden="true" />}
-            {busy ? "Paying…" : `Accept · ${q.total_price_usdc} USDC${passkey ? " · passkey" : ""}`}
+            {busy ? "Paying…" : `Accept · ${q.total_price_usdc} USDC${passkey ? " · Passkey" : ""}`}
           </Button>
         ) : (
           <div style={{ marginTop: bonded ? 4 : 14 }}>

@@ -44,7 +44,7 @@ export function ClaimCard() {
           <div style={{ flex: 1 }}><Input label="Match key (bytes32)" mono placeholder="0x…" value={key} onChange={(e) => setKey(e.target.value)} /></div>
           <Button variant="outline" size="sm" onClick={inspect} disabled={!key}>Inspect</Button>
           {wallet.connected
-            ? <Button size="sm" onClick={claim} disabled={busy || !key}>{busy ? "Claiming…" : "Claim for requester"}</Button>
+            ? <Button size="sm" onClick={claim} disabled={busy || !key}>{busy ? "Claiming…" : "Claim for Requester"}</Button>
             : <ConnectButton />}
         </div>
         {info && <div style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--foreground)" }}>{info}</div>}

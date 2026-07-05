@@ -40,7 +40,7 @@ export function ConnectButton() {
             <a href="/account" style={{ ...item, textDecoration: "none" }} onClick={() => setMenu(false)}>View account</a>
             <button style={item} onClick={() => { navigator.clipboard?.writeText(wallet.address!); setMenu(false); }}>Copy address</button>
             {wallet.kind === "passkey" && accounts.length > 1 && (
-              <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Switch account</button>
+              <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Switch Account</button>
             )}
             <button style={item} onClick={() => { setMenu(false); setModal(true); }}>Add / sign up</button>
             <button style={{ ...item, color: "var(--destructive)" }} onClick={() => { wallet.kind === "eoa" ? disconnect() : signOut(); setMenu(false); }}>Disconnect</button>

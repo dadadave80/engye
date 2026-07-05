@@ -38,7 +38,7 @@ export function RegisterForm() {
         <Input label="Capabilities" placeholder="summarization, question-answering" hint="Comma-separated." value={form.capabilities} onChange={set("capabilities")} style={{ gridColumn: "1 / -1" }} />
       </div>
       <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <Button size="sm" onClick={submit} disabled={state === "probing"}>{state === "probing" ? "Probing…" : "Probe & register"}</Button>
+        <Button size="sm" onClick={submit} disabled={state === "probing"}>{state === "probing" ? "Probing…" : "Probe & Register"}</Button>
         {state === "ok" && <span style={{ fontSize: 13, color: "var(--success)" }}>{message}</span>}
       </div>
     </Card>

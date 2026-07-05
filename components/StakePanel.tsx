@@ -102,7 +102,7 @@ export function StakePanel() {
         <div style={{ display: "flex", gap: 12 }}>
           <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount}
             onClick={() => run("Unstake request", [call(PROVIDER_STAKE, providerStakeAbi, "request_unstake", [usdcAtomic(Number(amount))])])}>
-            Request unstake
+            Request Unstake
           </Button>
           <Button variant="outline" size="sm" disabled={busy !== null || !canWithdraw}
             onClick={() => run("Withdraw", [call(PROVIDER_STAKE, providerStakeAbi, "withdraw", [])])}>

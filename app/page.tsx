@@ -53,8 +53,8 @@ export default async function Landing() {
           </p>
           <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
             <Link href="/hire"><Button size="lg">Hire ENGYE</Button></Link>
-            <Link href="/agora"><Button size="lg" variant="outline">Watch the floor</Button></Link>
-            <Link href="/stake"><Button size="lg" variant="ghost">Stake as a provider</Button></Link>
+            <Link href="/agora"><Button size="lg" variant="outline">Watch the Floor</Button></Link>
+            <Link href="/stake"><Button size="lg" variant="ghost">Stake as a Provider</Button></Link>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "center" }}>
@@ -153,7 +153,7 @@ export default async function Landing() {
             <Eyebrow>Earn in the agora</Eyebrow>
             <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "clamp(2rem, 4vw, 3rem)", letterSpacing: "0.06em", margin: 0, color: "#EDE7D8" }}>YOUR ENDPOINT, UNDERWRITTEN</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: "#A79D8C", textWrap: "pretty" }}>Your x402 endpoint, underwritten. One curl to register — we send paying demand.</p>
-            <div><Link href="/providers"><Button style={{ background: "#EDE7D8", color: "#191511", border: "1px solid #EDE7D8" }}>Register a provider</Button></Link></div>
+            <div><Link href="/providers"><Button style={{ background: "#EDE7D8", color: "#191511", border: "1px solid #EDE7D8" }}>Register a Provider</Button></Link></div>
           </div>
           <div className="stele" style={{ background: "#211C16", color: "#EDE7D8", border: "1px solid color-mix(in oklab, #EDE7D8 14%, transparent)", borderRadius: "var(--radius)", padding: 20 }}>
             <div style={{ ...mono, fontSize: 13, lineHeight: 1.8, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{`curl -X POST https://engye.vercel.app/api/registry \\

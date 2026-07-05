@@ -209,7 +209,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
                 size="sm" variant="outline" disabled={poking}
                 onClick={async () => { setPoking(true); await fetch("/api/settle", { method: "POST" }); setPoking(false); }}
               >
-                {poking ? "Settling…" : "Settle now (anyone may)"}
+                {poking ? "Settling…" : "Settle Now (Anyone May)"}
               </Button>
             )}
           </div>

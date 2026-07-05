@@ -84,7 +84,7 @@ export function PostTaskForm() {
               placeholder="What is the capital of Australia, and why is it not Sydney?"
               style={{ fontFamily: "var(--font-body)", fontSize: 14, padding: "10px 12px", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none", resize: "vertical" }} />
           </label>
-          <div><Button disabled={busy !== null || !spec} onClick={getQuote}>{busy === "quote" ? "Getting quote…" : "Get bonded quote"}</Button></div>
+          <div><Button disabled={busy !== null || !spec} onClick={getQuote}>{busy === "quote" ? "Getting Quote…" : "Get Bonded Quote"}</Button></div>
         </div>
       </Card>
 
@@ -102,7 +102,7 @@ export function PostTaskForm() {
               <Stat label="You pay" value={`${quote.total_price_usdc.toFixed(4)} USDC`} />
             </div>
             <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5, margin: 0 }}>{quote.reasoning_summary}</p>
-            <div><Button disabled={busy !== null} onClick={payAndExecute}>{busy === "pay" ? "Signing & paying…" : `Pay ${quote.total_price_usdc.toFixed(4)} USDC & execute`}</Button></div>
+            <div><Button disabled={busy !== null} onClick={payAndExecute}>{busy === "pay" ? "Signing & Paying…" : `Pay ${quote.total_price_usdc.toFixed(4)} USDC & Execute`}</Button></div>
           </div>
         </Card>
       )}

@@ -133,9 +133,9 @@ export function AccountPanel() {
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {/* header actions */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
-          <a href={FAUCET} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm">Add funds</Button></a>
+          <a href={FAUCET} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm">Add Funds</Button></a>
           <a href="https://docs.arc.network" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm" variant="outline">Help</Button></a>
-          <Button size="sm" variant="outline" onClick={signOff} style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}>Sign out</Button>
+          <Button size="sm" variant="outline" onClick={signOff} style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}>Sign Out</Button>
         </div>
 
         {/* Your account + QR */}
@@ -189,7 +189,7 @@ export function AccountPanel() {
         </Section>
 
         {/* Recovery = backup wallets (secp256k1 super-admin keys) — passkey accounts only */}
-        <Section title="Recovery" action={isPasskey ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => { setActErr(null); setPicking(true); }}>{busy === "add" ? "Signing…" : "Add wallet"}</Button> : undefined}>
+        <Section title="Recovery" action={isPasskey ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => { setActErr(null); setPicking(true); }}>{busy === "add" ? "Signing…" : "Add Wallet"}</Button> : undefined}>
           {!isPasskey ? (
             <div style={empty}>Recovery wallets are available for passkey accounts.</div>
           ) : recoveryWallets.length === 0 ? (

@@ -9,10 +9,10 @@ import { Button, Eyebrow } from "../ui/primitives";
 import { QuoteCard } from "./QuoteCard";
 
 const STARTERS = [
-  { label: "Summarize a link", text: "Summarize this article into 3 bullets: https://" },
+  { label: "Summarize a Link", text: "Summarize this article into 3 bullets: https://" },
   { label: "Extract JSON", text: "Extract {name, price} from this text: " },
-  { label: "Draft an email", text: "Write a short email declining a meeting politely because " },
-  { label: "Review code", text: "Review this function for bugs:\n```\n\n```" },
+  { label: "Draft an Email", text: "Write a short email declining a meeting politely because " },
+  { label: "Review Code", text: "Review this function for bugs:\n```\n\n```" },
 ];
 
 /* Internal — the assistant mark. Inlined (not exported) to avoid asset-path coupling. */
