@@ -66,8 +66,13 @@ export async function settleMatch(matchId: string): Promise<"settled" | "skipped
       const fresh = await validateDeliverable(quote.task.spec, quote.task.quality_bar, m.deliverable, matchId);
       const ins = await supabaseAdmin.from("validations").insert({ match_id: matchId, pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model });
       if (ins.error && !/duplicate key|already exists|unique|23505/i.test(ins.error.message)) throw new Error(`validation persist failed: ${ins.error.message}`);
+      // the unique index guarantees exactly one canonical row now exists — read it, never fall back
+      // to our own `fresh` verdict (that fallback WAS the divergence path: a losing racer proceeding
+      // on a different, unpersisted verdict). If the read fails, throw → settle_retry → a later sweep
+      // resumes on the canonical row. No settle proceeds on an unverified verdict.
       const reread = await supabaseAdmin.from("validations").select("pass,score,reasons,model").eq("match_id", matchId).maybeSingle();
-      v = reread.data ?? { pass: fresh.pass, score: fresh.score, reasons: fresh.reasons, model: fresh.model };
+      if (reread.error || !reread.data) throw new Error(`validation reread failed: ${reread.error?.message ?? "no canonical row after insert"}`);
+      v = reread.data;
     }
 
     // 2. MONEY — driven by on-chain state, not DB flags. Only bonded matches have on-chain steps.
@@ -138,7 +143,9 @@ export async function sweepDueMatches(limit = 10): Promise<number> {
   const { data: due } = await supabaseAdmin
     .from("matches").select("id")
     .or(`and(verdict_due_at.lt.${now},status.in.(awaiting_verdict,settle_retry)),and(verdict_due_at.lt.${now},status.eq.validating,validating_at.lt.${staleBefore}),and(status.eq.error,bond_tx.not.is.null)`)
-    .order("verdict_due_at", { ascending: true }).limit(limit);
+    // order by created_at (always non-null) not verdict_due_at — error-branch rows have a NULL
+    // verdict_due_at and would sort NULLS LAST, starving them behind a window-based backlog under limit().
+    .order("created_at", { ascending: true }).limit(limit);
   let done = 0;
   for (const row of due ?? []) if ((await settleMatch(row.id)) === "settled") done++;
   return done;
