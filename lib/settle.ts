@@ -44,20 +44,30 @@ export interface SettleChain {
   refundFromTreasury(matchKey: Hex, to: Address, amountUsdc: number): Promise<Hex>;
 }
 
+/** The best-effort reputation-tail effects (ERC-8004 + provider stats) — a seam so the tail's
+ *  verdict-flag wiring is testable and a test can never broadcast real registry txs. */
+export interface SettleTail {
+  respondValidation: typeof respondValidation;
+  giveFeedback: typeof giveFeedback;
+  applyOutcome: typeof applyOutcome;
+}
+
 export interface SettleDeps {
   store: MatchStore | null;
   chain: SettleChain;
   validate: typeof validateDeliverable;
+  tail: SettleTail;
 }
 
 const realChain: SettleChain = { getBond, releaseBond, slashBond, alreadySlashed, slashProviderStake, alreadyRefunded, refundFromTreasury };
-const realDeps = (): SettleDeps => ({ store: supabaseMatchStore(), chain: realChain, validate: validateDeliverable });
+const realDeps = (): SettleDeps => ({ store: supabaseMatchStore(), chain: realChain, validate: validateDeliverable, tail: { respondValidation, giveFeedback, applyOutcome } });
 
 /** Best-effort ERC-8004 + reputation tail. Money-free and idempotent — each step is guarded by its
  *  own tx column, so it is safe to re-run for a terminal match whose tail failed the first time.
  *  Never throws (logs and moves on); NEVER touches escrow/vault/stake, so it can't affect settlement. */
 async function runReputationTail(
   store: MatchStore,
+  tail: SettleTail,
   m: Pick<SettleMatchRow, "created_at" | "deliverable" | "validation_request_tx" | "validation_response_tx" | "feedback_tx">,
   provider: SettleProviderJoin | null,
   v: { pass: boolean; score: number },
@@ -66,15 +76,15 @@ async function runReputationTail(
 ): Promise<void> {
   try {
     if (m.validation_request_tx && !m.validation_response_tx) {
-      const responseTx = await respondValidation({
+      const responseTx = await tail.respondValidation({
         matchKey, score: v.score, deliverableHash: contentHash(JSON.stringify(m.deliverable ?? null)), passed: v.pass,
       });
       await store.recordTailTx(matchId, "validation_response_tx", responseTx);
     }
     if (provider?.agent_id && !m.feedback_tx) {
-      const feedbackTx = await giveFeedback({ providerAgentId: BigInt(provider.agent_id), score: v.score, passed: v.pass, matchKey });
+      const feedbackTx = await tail.giveFeedback({ providerAgentId: BigInt(provider.agent_id), score: v.score, passed: v.pass, matchKey });
       await store.recordTailTx(matchId, "feedback_tx", feedbackTx);
-      await applyOutcome({
+      await tail.applyOutcome({
         providerId: provider.id, matchId, pass: v.pass, score: v.score,
         latencyMs: Date.now() - Date.parse(m.created_at), earnedUsdc: Number(provider.price_usdc), onchainTx: feedbackTx,
       });
@@ -137,7 +147,7 @@ export async function settleMatch(matchId: string, deps: SettleDeps = realDeps()
 
     // 4. REPUTATION TAIL — best-effort, money-free, idempotent. If it fails here it is retried later
     //    by retryTails() (the sweep) so a Groq/RPC hiccup can't leave a permanent hole in the graph.
-    await runReputationTail(store, m, provider, { pass: v.pass, score: v.score }, matchKey, matchId);
+    await runReputationTail(store, deps.tail, m, provider, { pass: v.pass, score: v.score }, matchKey, matchId);
 
     return "settled";
   } catch (e) {
@@ -165,7 +175,7 @@ export async function retryTails(limit = 10, deps: SettleDeps = realDeps()): Pro
   let done = 0;
   for (const m of rows) {
     if (!m.verdict) continue; // no stored verdict → nothing to post
-    await runReputationTail(deps.store, m, m.providers, { pass: m.verdict.pass, score: m.verdict.score }, m.match_key, m.id);
+    await runReputationTail(deps.store, deps.tail, m, m.providers, { pass: m.verdict.pass, score: m.verdict.score }, m.match_key, m.id);
     done++;
   }
   return done;
