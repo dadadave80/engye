@@ -96,12 +96,22 @@ export async function POST(
   });
 
   const matches = supabaseMatchForward()!; // supabaseAdmin non-null was checked above
-  const match = await matches.insertMatch({
-    quote_id: id, provider_id: provider.id, match_key: matchKey,
-    decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
-    price_usdc: quote.total_price_usdc,
-    source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
-  });
+  let match: { id: string };
+  try {
+    match = await matches.insertMatch({
+      quote_id: id, provider_id: provider.id, match_key: matchKey,
+      decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
+      price_usdc: quote.total_price_usdc,
+      source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
+    });
+  } catch (e) {
+    // payment already settled but no match row exists to carry state — release the quote instead of
+    // bricking it at 'executing' (passkey buyers retry cleanly: their payment proof stays bound).
+    await supabaseAdmin.from("quotes").update({ status: "open" }).eq("id", id);
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(`[execute ${id}] match insert failed:`, message);
+    return NextResponse.json({ error: "match creation failed — please retry", message }, { status: 500 });
+  }
   await supabaseAdmin.from("quotes").update({ status: "executed" }).eq("id", id); // was 'executing'
 
   const txs: Record<string, string> = {};

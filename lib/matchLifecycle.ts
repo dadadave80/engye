@@ -25,7 +25,9 @@ export const TRANSITIONS: Record<MatchStatus, readonly MatchStatus[]> = {
   paid: ["awaiting_verdict", "error"],
   awaiting_verdict: ["validating", "error"],
   validating: ["delivered", "failed_compensated", "settle_retry", "validating"], // self-edge = stale-lease reclaim
-  settle_retry: ["validating"],
+  settle_retry: ["validating", "delivered", "failed_compensated"], // a settler that outlived its
+  // lease (racer demoted the row) may still finalize: the verdict is canonical and every money step
+  // is on-chain-guarded, so its terminal status is the same one any re-run would write
   error: ["validating"], // the sweep claims bonded errors for remediation
   delivered: [], // terminal
   failed_compensated: [], // terminal

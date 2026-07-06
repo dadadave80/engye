@@ -47,8 +47,8 @@ describe("transition table", () => {
     expect(legalFroms("bonded")).toEqual(["pending"]);
     expect(legalFroms("paid")).toEqual(["pending", "bonded"]); // unbonded path skips 'bonded'
     expect(legalFroms("awaiting_verdict")).toEqual(["paid"]);
-    expect(legalFroms("delivered")).toEqual(["validating"]); // only the lease holder finalizes
-    expect(legalFroms("failed_compensated")).toEqual(["validating"]);
+    expect(legalFroms("delivered")).toEqual(["validating", "settle_retry"]); // lease holder — or a settler a racer demoted
+    expect(legalFroms("failed_compensated")).toEqual(["validating", "settle_retry"]);
     expect(legalFroms("settle_retry")).toEqual(["validating"]);
     expect(legalFroms("error")).toEqual(["pending", "bonded", "paid", "awaiting_verdict"]);
   });

@@ -105,13 +105,18 @@ export interface MatchForward {
 export function supabaseMatchForward(): MatchForward | null {
   const sb = supabaseAdmin;
   if (!sb) return null;
-  // the bouncer: UPDATE … WHERE status IN legalFroms(to). Zero rows = an illegal jump — loud on the
-  // forward path (it means concurrent mutation the quote's atomic claim should make impossible).
+  // the bouncer: UPDATE … WHERE status IN legalFroms(to). These marks run AFTER money has moved
+  // (bond posted / provider paid), so they must never abort the lifecycle: an illegal jump is
+  // REFUSED at the DB and logged; a transient write error is retried once then logged. Aborting
+  // here was review-proven money-destroying (a DB blip flipped a delivered match into 'error' →
+  // the sweep validated a NULL deliverable → slash). Recovery (sweep + claim_timeout) owns the rest.
   const guarded = async (id: string, to: MatchStatus, patch: Record<string, unknown>) => {
-    const { data, error } = await sb.from("matches").update({ status: to, ...patch }).eq("id", id)
+    const write = () => sb.from("matches").update({ status: to, ...patch }).eq("id", id)
       .in("status", legalFroms(to)).select("id");
-    if (error) throw new Error(`match → ${to} write failed: ${error.message}`);
-    if (!data?.length) throw new Error(`illegal transition: match ${id} is not in [${legalFroms(to).join("|")}] — refused → ${to}`);
+    let { data, error } = await write();
+    if (error) ({ data, error } = await write()); // one immediate retry kills most transients
+    if (error) console.error(`[matchStore] match ${id} → ${to} write failed (continuing best-effort): ${error.message}`);
+    else if (!data?.length) console.error(`[matchStore] REFUSED illegal transition: match ${id} not in [${legalFroms(to).join("|")}] → ${to}`);
   };
   return {
     async insertMatch(row) {
@@ -171,12 +176,15 @@ export function supabaseMatchStore(): MatchStore | null {
       if (upd.refundTx) hashes.refund_tx = upd.refundTx;
       if (upd.stakeSlashTx) hashes.stake_slash_tx = upd.stakeSlashTx;
       const row = { status: upd.status, settled_at: new Date().toISOString(), latency_ms: upd.latencyMs, ...hashes };
-      const { data } = await sb.from("matches").update(row).eq("id", matchId)
+      const { data, error } = await sb.from("matches").update(row).eq("id", matchId)
         .in("status", legalFroms(upd.status)).select("id");
+      // an error is NOT "a racer finalized first" — throw so the settle engine's retry loop re-runs
+      if (error) throw new Error(`finalize write failed: ${error.message}`);
       if (!data?.length && Object.keys(hashes).length) {
         // a racer finalized first (same canonical verdict → same status). Never lose an on-chain
         // fact this attempt produced: patch the tx hashes WITHOUT touching the terminal status.
-        await sb.from("matches").update(hashes).eq("id", matchId);
+        const patch = await sb.from("matches").update(hashes).eq("id", matchId);
+        if (patch.error) throw new Error(`finalize hash-patch failed: ${patch.error.message}`);
       }
     },
 
@@ -196,7 +204,16 @@ export function supabaseMatchStore(): MatchStore | null {
       // .lt(). Order by created_at (never NULL) so error rows aren't starved under limit().
       const { data } = await sb
         .from("matches").select("id")
-        .or(`and(verdict_due_at.lt.${now},status.in.(awaiting_verdict,settle_retry)),and(verdict_due_at.lt.${now},status.eq.validating,validating_at.lt.${staleBefore}),and(status.eq.error,bond_tx.not.is.null)`)
+        .or([
+          `and(verdict_due_at.lt.${now},status.in.(awaiting_verdict,settle_retry))`,
+          `and(verdict_due_at.lt.${now},status.eq.validating,validating_at.lt.${staleBefore})`,
+          `and(status.eq.error,bond_tx.not.is.null)`,
+          // error-remediation rows carry a NULL verdict_due_at (crash before delivery) — after one
+          // failed remediation attempt they sit at settle_retry / stale-validating and must remain
+          // sweepable, or the requester's refund never fires (review finding, pre-existing).
+          `and(verdict_due_at.is.null,bond_tx.not.is.null,status.eq.settle_retry)`,
+          `and(verdict_due_at.is.null,bond_tx.not.is.null,status.eq.validating,validating_at.lt.${staleBefore})`,
+        ].join(","))
         .order("created_at", { ascending: true }).limit(limit);
       return (data ?? []).map((r: { id: string }) => r.id);
     },
