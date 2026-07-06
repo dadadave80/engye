@@ -4,8 +4,12 @@
 // Disconnected → the handoff .gate + a dimmed preview; connected → the real .card form.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount, useWalletClient } from "wagmi";
+import { useWalletClient } from "wagmi";
+import { KeyRound } from "lucide-react";
 import { ConnectGate } from "./ConnectGate";
+import { useWallet } from "./wallet/useWallet";
+import { usePasskey } from "./wallet/passkey";
+import { payForQuote } from "./wallet/passkeyClient";
 import { payX402, ensureGatewayFloat } from "@/lib/gatewayBrowser";
 import { ARCSCAN } from "@/lib/clientChain";
 
@@ -46,8 +50,10 @@ function PostPreview() {
 
 export function PostTaskForm() {
   const router = useRouter();
-  const { isConnected } = useAccount();
-  const { data: wallet } = useWalletClient();
+  const wallet = useWallet();                     // unified: passkey takes precedence over EOA
+  const { current } = usePasskey();               // the passkey payer (rail: userOp)
+  const { data: walletClient } = useWalletClient(); // the EOA payer (rail: Gateway x402)
+  const passkey = wallet.kind === "passkey";
   const [type, setType] = useState("question-answering");
   const [spec, setSpec] = useState("");
   const [maxPrice, setMaxPrice] = useState("0.01");
@@ -61,7 +67,7 @@ export function PostTaskForm() {
     try {
       const res = await fetch("/api/broker/quote", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ task: { type, spec, max_price_usdc: Number(maxPrice) }, requester_wallet: wallet?.account.address }),
+        body: JSON.stringify({ task: { type, spec, max_price_usdc: Number(maxPrice) }, requester_wallet: wallet.address }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.detail ?? body.error ?? "quote failed");
@@ -71,11 +77,19 @@ export function PostTaskForm() {
   }
 
   async function payAndExecute() {
-    if (!wallet || !quote || quote.declined) return;
+    if (!quote || quote.declined) return;
     setBusy("pay"); setErr(null);
     try {
-      await ensureGatewayFloat(wallet, Math.max(0.5, quote.total_price_usdc * 4));
-      const res = await payX402(wallet, `/api/broker/execute/${quote.quote_id}`, { method: "POST", body: "{}" });
+      // dual-rail, matching /hire's QuoteCard: passkey pays via a userOp bound to the quote;
+      // an EOA tops up its Gateway float and pays via browser x402. Passkey is Gateway-incapable.
+      let res: Response;
+      if (wallet.kind === "passkey" && current) {
+        const hash = await payForQuote(current, quote.quote_id);
+        res = await fetch(`/api/broker/execute/${quote.quote_id}`, { method: "POST", headers: { "content-type": "application/json", "x-engye-payment-tx": hash }, body: "{}" });
+      } else if (wallet.kind === "eoa" && walletClient) {
+        await ensureGatewayFloat(walletClient, Math.max(0.5, quote.total_price_usdc * 4));
+        res = await payX402(walletClient, `/api/broker/execute/${quote.quote_id}`, { method: "POST", body: "{}" });
+      } else throw new Error("connect a wallet or passkey first");
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? body.error ?? "execution failed");
       setResult(body);
@@ -84,7 +98,7 @@ export function PostTaskForm() {
     finally { setBusy(null); }
   }
 
-  if (!isConnected) {
+  if (!wallet.connected) {
     return (
       <>
         <ConnectGate title="Connect to post">A posted task is escrowed up front; the broker only quotes what it can honestly price.</ConnectGate>
@@ -131,7 +145,8 @@ export function PostTaskForm() {
           <p className="small muted" style={{ margin: "0 0 0.5rem" }}>{quote.reasoning_summary}</p>
           <div className="quote-actions">
             <button className="btn btn-primary" disabled={busy !== null} aria-disabled={busy !== null} onClick={payAndExecute}>
-              {busy === "pay" ? "Signing & paying…" : `Pay ${fx(quote.total_price_usdc)} USDC & execute`}
+              {passkey && <KeyRound size={14} aria-hidden="true" />}
+              {busy === "pay" ? "Signing & paying…" : `Pay ${fx(quote.total_price_usdc)} USDC & execute${passkey ? " · Passkey" : ""}`}
             </button>
           </div>
         </div>
