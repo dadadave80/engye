@@ -1,25 +1,20 @@
 "use client";
-// Account / profile page — modeled on id.porto.sh's account view (Your account + QR, Assets,
-// Permissions, Recovery, Add funds / Help / Sign out), wired to ENGYE's real on-chain data.
+// Account / profile page — the connected passkey (Circle MSCA): address + QR, Assets, and passkey
+// Recovery (register a BIP-39 phrase so a lost device never locks the account). Wired to real
+// on-chain balances; recovery uses Circle Modular Wallets' recoveryActions (see lib/circleWallet).
 import { useCallback, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { useDisconnect } from "wagmi";
-import { encodeFunctionData, decodeAbiParameters, type Address } from "viem";
-import { ExternalLink, Copy, Check, ChevronDown, ChevronRight, X } from "lucide-react";
+import { ExternalLink, Copy, Check, ChevronDown, ChevronRight, ShieldCheck } from "lucide-react";
 import { Card, Button, Eyebrow } from "./ui/primitives";
 import { ConnectGate } from "./ConnectGate";
-import { AddRecoveryModal } from "./wallet/AddRecoveryModal";
+import { RecoveryModal } from "./wallet/RecoveryModal";
+import { hasRecoverySet } from "./wallet/recoveryStore";
 import { useWallet } from "./wallet/useWallet";
 import { usePasskey } from "./wallet/passkey";
-import { useAccountActions } from "./wallet/useAccountActions";
-import { ithacaAbi, sessionKeyFor, KeyType, type Call } from "@/lib/ithaca";
-import { publicClient, USDC, PROVIDER_STAKE, erc20Abi, providerStakeAbi, ithacaKeysAbi, fromAtomic, ARCSCAN } from "@/lib/clientChain";
+import { publicClient, USDC, PROVIDER_STAKE, erc20Abi, providerStakeAbi, fromAtomic, ARCSCAN } from "@/lib/clientChain";
 
 const FAUCET = "https://faucet.circle.com/";
 const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
-const keyTypeLabel = (t: number) => (["P256", "Passkey · WebAuthn", "Wallet · secp256k1", "External · secp256k1"][t] ?? `type ${t}`);
-
-interface KeyRow { expiry: number; keyType: number; isSuperAdmin: boolean; hash: `0x${string}`; publicKey: `0x${string}` }
 
 const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 const rowStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--border)", flexWrap: "wrap" };
@@ -34,7 +29,7 @@ function Section({ title, action, children }: { title: string; action?: React.Re
           <span style={{ fontSize: 16, fontWeight: 600 }}>{title}</span>
           {action}
         </div>
-        <button onClick={() => setOpen((o) => !o)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "inline-flex" }}>
+        <button onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse" : "Expand"} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "inline-flex" }}>
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
       </div>
@@ -47,18 +42,13 @@ export function AccountPanel() {
   const wallet = useWallet();
   const address = wallet.address;
   const isPasskey = wallet.kind === "passkey";
-  const { disconnect } = useDisconnect();
-  const { signOut } = usePasskey();
-  const { send } = useAccountActions();
+  const { current, signOut } = usePasskey();
   const [usdc, setUsdc] = useState<bigint>(0n);
   const [staked, setStaked] = useState<bigint>(0n);
-  const [keys, setKeys] = useState<KeyRow[]>([]);
   const [copied, setCopied] = useState(false);
-  const [picking, setPicking] = useState(false); // wallet-picker modal open
-  const [busy, setBusy] = useState<string | null>(null); // "add" | `revoke:${hash}`
-  const [actErr, setActErr] = useState<string | null>(null);
+  const [recoverySet, setRecoverySet] = useState(false);
+  const [showRecovery, setShowRecovery] = useState(false);
 
-  // Non-throwing: a flaky read must never surface as an action error. Each read is independent.
   const load = useCallback(async () => {
     if (!address) return;
     try {
@@ -68,16 +58,12 @@ export function AccountPanel() {
       ]);
       setUsdc(u as bigint); setStaked(s as bigint);
     } catch { /* transient read failure — keep last known balances */ }
-    if (isPasskey) {
-      try {
-        const [ks, hashes] = await publicClient.readContract({ address, abi: ithacaKeysAbi, functionName: "getKeys" });
-        setKeys(ks.map((k, i) => ({ expiry: Number(k.expiry), keyType: Number(k.keyType), isSuperAdmin: k.isSuperAdmin, hash: hashes[i], publicKey: k.publicKey })));
-      } catch { /* keep last known keys */ }
-    }
-  }, [address, isPasskey]);
+  }, [address]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setState runs after await
   useEffect(() => { void load(); }, [load]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage read (client only)
+  useEffect(() => { if (address) setRecoverySet(hasRecoverySet(address)); }, [address]);
 
   function copy() {
     if (!address) return;
@@ -85,44 +71,16 @@ export function AccountPanel() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1400);
   }
-  function signOff() { wallet.kind === "eoa" ? disconnect() : signOut(); }
-
-  // Recovery: authorize a connected backup wallet as a super-admin secp256k1 key (passkey signs; ENGYE relays)
-  async function addRecovery(addr: `0x${string}`) {
-    if (address && addr.toLowerCase() === address.toLowerCase()) { setActErr("That's this account — pick a different wallet."); return; }
-    if (keys.some((k) => k.keyType === KeyType.Secp256k1 && (decodeAbiParameters([{ type: "address" }], k.publicKey)[0] as string).toLowerCase() === addr.toLowerCase())) {
-      setActErr("That wallet is already a recovery method."); return;
-    }
-    setBusy("add"); setActErr(null);
-    try {
-      const call: Call = { to: address as Address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "authorize", args: [sessionKeyFor(addr)] }) };
-      await send([call]); // the action — its success/failure is authoritative
-    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); setBusy(null); disconnect(); return; }
-    setBusy(null);
-    disconnect(); // drop any transient connection made just to read the recovery wallet's address
-    void load(); // refresh separately — a read failure here is non-fatal, not an action error
-  }
-  async function revokeKey(hash: `0x${string}`) {
-    setBusy(`revoke:${hash}`); setActErr(null);
-    try {
-      const call: Call = { to: address as Address, value: 0n, data: encodeFunctionData({ abi: ithacaAbi, functionName: "revoke", args: [hash] }) };
-      await send([call]);
-    } catch (e) { setActErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); setBusy(null); return; }
-    setBusy(null);
-    void load();
-  }
 
   if (!wallet.connected || !address) {
     return (
       <ConnectGate title="Connect to view your ledger">
-        Your balances and signers live on Arc; this page is just a window onto them.
+        Your balances and recovery live on Arc; this page is just a window onto them.
       </ConnectGate>
     );
   }
 
   const noBalances = usdc === 0n && staked === 0n;
-  const signers = keys.filter((k) => k.keyType !== KeyType.Secp256k1); // passkeys
-  const recoveryWallets = keys.filter((k) => k.keyType === KeyType.Secp256k1); // backup wallets
 
   return (
     <Card padding={24}>
@@ -131,7 +89,7 @@ export function AccountPanel() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <a href={FAUCET} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm">Add Funds</Button></a>
           <a href="https://docs.arc.network" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm" variant="outline">Help</Button></a>
-          <Button size="sm" variant="outline" onClick={signOff}>Sign Out</Button>
+          <Button size="sm" variant="outline" onClick={signOut}>Sign Out</Button>
         </div>
 
         {/* Your account + QR */}
@@ -142,7 +100,7 @@ export function AccountPanel() {
               <span style={{ ...mono, fontSize: 15 }}>{trunc(address)}</span>
               {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} color="var(--muted-foreground)" />}
             </button>
-            <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{isPasskey ? "Passkey · Ithaca smart account · ENGYE relays gas" : "Injected wallet · self-custodial"}</span>
+            <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>{isPasskey ? "Passkey · Circle smart account · ENGYE relays gas" : "Wallet"}</span>
             <a href={`${ARCSCAN}/address/${address}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--link)", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
               View on Arcscan <ExternalLink size={11} />
             </a>
@@ -156,8 +114,8 @@ export function AccountPanel() {
         <Section title="Assets">
           {noBalances ? <div style={empty}>No balances available for this account.</div> : (
             <div>
-              <div style={rowStyle}><span style={{ color: "var(--muted-foreground)" }}>USDC</span><span style={mono}>{fromAtomic(usdc).toFixed(4)}</span></div>
-              {staked > 0n && <div style={rowStyle}><span style={{ color: "var(--muted-foreground)" }}>Staked (co-insurance)</span><span style={mono}>{fromAtomic(staked).toFixed(4)}</span></div>}
+              <div style={rowStyle}><span style={{ color: "var(--muted-foreground)" }}>USDC</span><span style={mono}>{fromAtomic(usdc).toFixed(3)}</span></div>
+              {staked > 0n && <div style={rowStyle}><span style={{ color: "var(--muted-foreground)" }}>Staked (co-insurance)</span><span style={mono}>{fromAtomic(staked).toFixed(3)}</span></div>}
             </div>
           )}
           {usdc < 1_000000n && (
@@ -167,53 +125,35 @@ export function AccountPanel() {
           )}
         </Section>
 
-        {/* Permissions = authorized signers (the passkey) */}
-        <Section title="Permissions">
-          {!isPasskey ? <div style={empty}>Self-custodial wallet — full control, no delegated signers.</div>
-            : signers.length === 0 ? <div style={empty}>No authorized signers found.</div>
-            : signers.map((k) => (
-              <div key={k.hash} style={rowStyle}>
-                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontSize: 13 }}>{keyTypeLabel(k.keyType)}</span>
-                  <span style={{ ...mono, fontSize: 11, color: "var(--muted-foreground)" }}>{trunc(k.hash)}</span>
-                </span>
-                <span style={{ fontSize: 12, color: k.isSuperAdmin ? "var(--gold-lifted)" : "var(--muted-foreground)" }}>
-                  {k.isSuperAdmin ? "super-admin" : "scoped"} · {k.expiry === 0 ? "never expires" : `exp ${new Date(k.expiry * 1000).toLocaleDateString()}`}
-                </span>
-              </div>
-            ))}
-        </Section>
-
-        {/* Recovery = backup wallets (secp256k1 super-admin keys) — passkey accounts only */}
-        <Section title="Recovery" action={isPasskey ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => { setActErr(null); setPicking(true); }}>{busy === "add" ? "Signing…" : "Add Wallet"}</Button> : undefined}>
+        {/* Recovery — register a BIP-39 phrase so a lost passkey never locks the account */}
+        <Section title="Recovery" action={
+          isPasskey && current
+            ? <Button size="sm" variant="outline" onClick={() => setShowRecovery(true)}>{recoverySet ? "Rotate phrase" : "Set up recovery"}</Button>
+            : undefined
+        }>
           {!isPasskey ? (
-            <div style={empty}>Recovery wallets are available for passkey accounts.</div>
-          ) : recoveryWallets.length === 0 ? (
-            <div style={empty}>No recovery methods added yet.</div>
+            <div style={empty}>Recovery is available for passkey accounts.</div>
+          ) : recoverySet ? (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0" }}>
+              <ShieldCheck size={18} color="var(--success)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, lineHeight: 1.5 }}>
+                <b>Recovery is active.</b> A recovery phrase is registered on-chain. Keep it safe — if you lose this device, choose <b>&ldquo;Recover a lost passkey&rdquo;</b> when connecting and enter the phrase.
+              </span>
+            </div>
           ) : (
-            <div>
-              {recoveryWallets.map((k) => {
-                const addr = decodeAbiParameters([{ type: "address" }], k.publicKey)[0] as string;
-                return (
-                  <div key={k.hash} style={rowStyle}>
-                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ ...mono, fontSize: 13 }}>{trunc(addr)}</span>
-                      <span style={{ fontSize: 11, color: "var(--muted-foreground)" }}>backup wallet · super-admin</span>
-                    </span>
-                    <button onClick={() => revokeKey(k.hash)} disabled={busy !== null} title="Remove recovery wallet"
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted-foreground)", display: "inline-flex" }}>
-                      {busy === `revoke:${k.hash}` ? <span style={{ fontSize: 12 }}>removing…</span> : <X size={15} />}
-                    </button>
-                  </div>
-                );
-              })}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0" }}>
+              <ShieldCheck size={18} color="var(--muted-foreground)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, lineHeight: 1.5, color: "var(--muted-foreground)" }}>
+                No recovery yet. This account lives only on this device&apos;s passkey — set up a recovery phrase so a lost or wiped device doesn&apos;t lock you out for good.
+              </span>
             </div>
           )}
         </Section>
-
-        {actErr && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)", marginTop: 8 }}>{actErr}</div>}
       </div>
-      {picking && <AddRecoveryModal onSelect={addRecovery} onClose={() => setPicking(false)} />}
+
+      {showRecovery && current && (
+        <RecoveryModal session={current} onClose={() => setShowRecovery(false)} onDone={() => { if (address) setRecoverySet(true); }} />
+      )}
     </Card>
   );
 }

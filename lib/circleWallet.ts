@@ -6,9 +6,11 @@
 // gas (paymaster:true). Needs NEXT_PUBLIC_CLIENT_KEY + NEXT_PUBLIC_CLIENT_URL from the Circle Console.
 import { createPublicClient, type Address, type Hex } from "viem";
 import { arcTestnet } from "viem/chains";
+import { english, generateMnemonic, mnemonicToAccount } from "viem/accounts";
 import { createBundlerClient, toWebAuthnAccount, type WebAuthnAccount } from "viem/account-abstraction";
 import {
   WebAuthnMode,
+  recoveryActions,
   toCircleSmartAccount,
   toModularTransport,
   toPasskeyTransport,
@@ -81,4 +83,52 @@ export async function sendCalls(credential: StoredCredential, calls: { to: Addre
   const { receipt } = await bundler.waitForUserOperationReceipt({ hash: userOpHash });
   if (receipt.status !== "success") throw new Error("user operation reverted");
   return receipt.transactionHash;
+}
+
+// ---------- Passkey recovery (Circle Modular Wallets recoveryActions) ----------
+// SETUP (while the user still has the passkey): generate a BIP-39 phrase, derive its EOA, and
+// register that EOA as a recovery owner on the MSCA. The phrase is the ONLY way back if the passkey
+// is lost — shown once, never persisted server-side. RESTORE (passkey lost): the phrase's EOA
+// authorizes swapping the account's owner to a fresh passkey. Both are gasless (Gas Station).
+
+/** Generate a fresh recovery phrase + the EOA address it derives (nothing on-chain yet). */
+export function generateRecovery(): { mnemonic: string; recoveryAddress: Address } {
+  const mnemonic = generateMnemonic(english);
+  return { mnemonic, recoveryAddress: mnemonicToAccount(mnemonic).address };
+}
+
+/** True if `phrase` is a well-formed BIP-39 mnemonic (viem's mnemonicToAccount throws on a bad one). */
+export function isValidMnemonic(phrase: string): boolean {
+  try { mnemonicToAccount(phrase.trim()); return true; } catch { return false; }
+}
+
+/** Register the recovery EOA on the passkey's MSCA (gasless). Returns the mined tx hash. */
+export async function registerRecovery(credential: StoredCredential, recoveryAddress: Address): Promise<Hex> {
+  const { bundler } = clients();
+  const recovery = bundler.extend(recoveryActions);
+  const account = await accountFromCredential(credential);
+  const userOpHash = await recovery.registerRecoveryAddress({ account, recoveryAddress, paymaster: true });
+  const { receipt } = await recovery.waitForUserOperationReceipt({ hash: userOpHash });
+  if (receipt.status !== "success") throw new Error("recovery registration reverted");
+  return receipt.transactionHash;
+}
+
+/** Restore a lost passkey: mint a NEW passkey, then use the recovery phrase's EOA to swap the MSCA
+ *  owner to it. Returns the new credential + the recovered account address. */
+export async function recoverWithMnemonic(phrase: string, username: string): Promise<{ credential: StoredCredential; address: Address }> {
+  const { passkeyTransport, public: client, bundler } = clients();
+  const recovery = bundler.extend(recoveryActions);
+  // 1. mint a fresh passkey (device biometric)
+  const fresh = await toWebAuthnCredential({ transport: passkeyTransport, mode: WebAuthnMode.Register, username });
+  // 2. a temp MSCA owned by the recovery EOA — the signer that authorizes the swap
+  const owner = mnemonicToAccount(phrase.trim());
+  const tempAccount = await toCircleSmartAccount({ client, owner });
+  // 3. swap the recovered account's owner to the new passkey
+  const userOpHash = await recovery.executeRecovery({ account: tempAccount, credential: fresh, paymaster: true });
+  const { receipt } = await recovery.waitForUserOperationReceipt({ hash: userOpHash });
+  if (receipt.status !== "success") throw new Error("recovery execution reverted");
+  // 4. the new passkey now controls the account — derive its address for the session
+  const credential = strip(fresh);
+  const account = await accountFromCredential(credential);
+  return { credential, address: account.address };
 }

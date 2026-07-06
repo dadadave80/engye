@@ -10,7 +10,7 @@ import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } f
 import { usePasskey, type PasskeySession } from "./passkey";
 import { EXTERNAL_WALLETS_ENABLED } from "./useWallet";
 import { signUpPasskey, loginPasskey } from "./passkeyClient";
-import { circleConfigured } from "@/lib/circleWallet";
+import { circleConfigured, isValidMnemonic, recoverWithMnemonic } from "@/lib/circleWallet";
 
 const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -23,10 +23,11 @@ const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantN
 export function ConnectModal({ onClose }: { onClose: () => void }) {
   const { accounts, current, addAccount, switchTo } = usePasskey();
   const { connect } = useConnect();
-  const [view, setView] = useState<"main" | "switch">("main");
+  const [view, setView] = useState<"main" | "switch" | "recover">("main");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [email, setEmail] = useState("");
+  const [phrase, setPhrase] = useState("");
   // Circle username rule: 5–50 chars, alphanumeric + _@.:+- (an email fits; it becomes the passkey's
   // identity in Google Password Manager / the authenticator).
   const emailOk = /^[A-Za-z0-9_@.:+-]{5,50}$/.test(email.trim());
@@ -51,6 +52,22 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
   function continueWith() {
     if (active) { switchTo(active.address); onClose(); } // known device → no re-prompt
     else run(loginPasskey); // returning user, no local session → pick an existing passkey
+  }
+
+  // Restore a lost passkey from the recovery phrase: mint a fresh passkey and swap the account owner.
+  async function doRecover() {
+    if (!isValidMnemonic(phrase)) { setErr("That doesn't look like a valid recovery phrase."); return; }
+    setBusy(true); setErr(null);
+    try {
+      const username = `ENGYE-rec-${Math.random().toString(36).slice(2, 8)}`;
+      const { credential, address } = await recoverWithMnemonic(phrase, username);
+      addAccount({ address, credential, label: username });
+      onClose();
+    } catch (e) {
+      const cause = (e as { cause?: { message?: string } })?.cause?.message?.split("\n")[0];
+      const msg = e instanceof Error ? e.message.split("\n")[0] : String(e);
+      setErr(cause && cause !== msg ? `${msg} (${cause})` : msg);
+    } finally { setBusy(false); }
   }
 
   // Portal to <body> so the fixed overlay escapes the header's containing block. The sticky
@@ -86,6 +103,18 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               ))}
               <button onClick={() => setView("main")} style={{ ...link, marginTop: 6, alignSelf: "flex-start" }}>← Back</button>
             </div>
+          </div>
+        ) : view === "recover" ? (
+          <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Recover a lost passkey</div>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5 }}>Enter the recovery phrase you saved when you set up this account. We&apos;ll create a new passkey on this device and hand it control of your account — gas is sponsored.</p>
+            <textarea value={phrase} onChange={(e) => setPhrase(e.target.value)} rows={3} placeholder="your twelve recovery words, separated by spaces" aria-label="Recovery phrase"
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none", resize: "vertical" }} />
+            <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={doRecover}>
+              <ScanFace size={16} /> {busy ? "Recovering…" : "Recover account"}
+            </button>
+            <button style={{ ...link, alignSelf: "center" }} onClick={() => { setView("main"); setErr(null); }}>← Back</button>
+            {err && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)" }}>{err}</div>}
           </div>
         ) : (
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -129,6 +158,8 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
                 Passkey sign-in is being configured{EXTERNAL_WALLETS_ENABLED ? " — use a browser wallet below in the meantime." : " — please check back shortly."}
               </div>
             )}
+
+            {configured && <button style={{ ...link, alignSelf: "center", fontSize: 12.5 }} onClick={() => { setErr(null); setPhrase(""); setView("recover"); }}>Lost your passkey? Recover with your phrase</button>}
 
             {/* browser wallet (EOA) — hidden this version (passkey-only); flip EXTERNAL_WALLETS_ENABLED
                 in useWallet to restore. Mobile browsers have no injected provider — the real path is
