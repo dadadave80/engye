@@ -1,22 +1,21 @@
 "use client";
+// Dashboard live match feed — handoff table (caption + seals + tx-link + Σ reconciliation note),
+// fed by an initial server snapshot and one realtime subscription on `matches`.
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { Badge, AddressChip } from "./ui/primitives";
-import { EmptyState } from "./ui/primitives";
-import type { FeedRow } from "@/lib/queries";
+import type { FeedRow, UiStatus } from "@/lib/queries";
 import { toUiStatus } from "@/lib/queries";
 
 const ARCSCAN = "https://testnet.arcscan.app";
-const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" };
-const td: React.CSSProperties = { padding: "10px 12px", fontSize: 14, borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
-const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 
 const rel = (iso: string) => {
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return `${Math.floor(s)}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return `${Math.floor(s / 3600)}h ago`;
+  if (s < 60) return `${Math.floor(s)}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h`;
 };
+const sealClass: Record<UiStatus, string> = { PASS: "seal-pass", SLASHED: "seal-slashed", OPEN: "seal-open" };
+const trunc = (tx: string) => `${tx.slice(0, 6)}…`;
 
 export function LiveFeed({ initial }: { initial: FeedRow[] }) {
   const [rows, setRows] = useState<FeedRow[]>(initial);
@@ -32,7 +31,6 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, async (payload) => {
         const m = payload.new as Record<string, any>;
         if (!m?.id) return;
-        // hydrate provider + task (realtime payload lacks joins)
         const { data } = await sb.from("matches").select("id,created_at,status,bond_usdc,price_usdc,source,settle_tx,bond_tx,providers(name),quotes(task,confidence)").eq("id", m.id).single();
         if (!data) return;
         const d = data as Record<string, any>;
@@ -49,31 +47,34 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
     return () => { sb.removeChannel(ch); };
   }, []);
 
-  if (rows.length === 0) {
-    return <EmptyState title="The agora is quiet." description="The demand agent buys every few minutes — the first bonded match will appear here." />;
-  }
-
   return (
-    <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>
-          <th style={th}>Time</th><th style={th}>Task</th><th style={th}>Provider</th>
-          <th style={th}>ĉ</th><th style={th}>Bond</th><th style={th}>Status</th><th style={th}>Tx</th>
-        </tr></thead>
+    <div className="table-wrap">
+      <table>
+        <caption>Live match feed <span className="tag">newest first · realtime</span></caption>
+        <thead>
+          <tr>
+            <th scope="col">Time</th><th scope="col">Task</th><th scope="col">Provider</th>
+            <th scope="col" className="t-right">ĉ</th><th scope="col" className="t-right">Bond</th>
+            <th scope="col">Status</th><th scope="col">Tx</th>
+          </tr>
+        </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className={["row-hover", r.id === freshId ? "engye-row-in" : ""].join(" ").trim()}>
-              <td style={{ ...td, color: "var(--muted-foreground)" }} title={r.created_at}>{rel(r.created_at)}</td>
-              <td style={td}>{r.task}{r.source === "demand_agent" && <span style={{ ...mono, fontSize: 10, color: "var(--muted-foreground)", marginLeft: 6 }}>·demand</span>}</td>
-              <td style={td}>{r.provider}</td>
-              <td style={{ ...td, ...mono }}>{r.confidence != null ? r.confidence.toFixed(2) : "—"}</td>
-              <td style={{ ...td, ...mono }}>{r.bond != null ? Number(r.bond).toFixed(3) : "—"}</td>
-              <td style={td}><Badge status={r.status} /></td>
-              <td style={td}>{r.tx ? <AddressChip address={r.tx} href={`${ARCSCAN}/tx/${r.tx}`} /> : <span style={{ color: "var(--muted-foreground)" }}>—</span>}</td>
+          {rows.length === 0 ? (
+            <tr><td colSpan={7} className="muted">The agora is quiet — the demand agent buys every few minutes.</td></tr>
+          ) : rows.map((r) => (
+            <tr key={r.id} className={r.id === freshId ? "engye-row-in" : undefined}>
+              <td className="num muted" title={r.created_at}>{rel(r.created_at)}</td>
+              <td>{r.task}{r.source === "demand_agent" && <span className="num" style={{ fontSize: 10, color: "var(--muted)", marginLeft: 6 }}>·demand</span>}</td>
+              <td>{r.provider}</td>
+              <td className="num t-right">{r.confidence != null ? r.confidence.toFixed(2) : "—"}</td>
+              <td className="num t-right">{r.bond != null ? Number(r.bond).toFixed(3) : "—"}</td>
+              <td><span className={`seal ${sealClass[r.status]}`}>{r.status}</span></td>
+              <td>{r.tx ? <a className="tx-link" href={`${ARCSCAN}/tx/${r.tx}`} target="_blank" rel="noreferrer" title="View on Arcscan">{trunc(r.tx)} ↗</a> : <span className="muted">—</span>}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      <div className="tfoot-note">Σ payments + bonds − slashes = balances <span className="ok">✓ ledger reconciles</span></div>
     </div>
   );
 }

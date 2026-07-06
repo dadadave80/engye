@@ -36,6 +36,12 @@ export default async function AgoraPage() {
 
   return (
     <AppShell settled={totals?.matchesSettled ?? 0}>
+      <div className="page-head">
+        <p className="kicker">The Agora</p>
+        <h1>Every verdict lands in public.</h1>
+        <p className="lede">ENGYE&apos;s money is on the table below. The validator doesn&apos;t care whose.</p>
+        <hr className="ledger-rule" />
+      </div>
       <Floor initialLive={initialLive} initialFeed={initialFeed} />
     </AppShell>
   );

@@ -186,6 +186,7 @@ async function persistQuote(
     quote_id: quote.id,
     action: d.action,
     provider_id: provider!.id,
+    provider_name: provider!.name,
     confidence: d.confidence!,
     bond_usdc: derived!.bond,
     total_price_usdc: derived!.total,

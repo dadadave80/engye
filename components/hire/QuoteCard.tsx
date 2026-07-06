@@ -1,11 +1,10 @@
 "use client";
 // Renders get_quote tool output; Accept pays via the caller's rail. The card's numbers come from
-// the tool payload only — the model cannot alter them.
-// Visuals adopted from design-system/import/market/QuoteCard.jsx (bonded / best-effort / declined / accepted).
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { Coins, Check, Scale, KeyRound, type LucideIcon } from "lucide-react";
-import { Card, Button } from "../ui/primitives";
-import { ConnectButton } from "../wallet/ConnectButton";
+// the tool payload only — the model cannot alter them. The bonded state IS the product's flagship
+// component — rebuilt to the handoff .quote-card (stele double rule, quote-grid, verdigris accent).
+import { useState, type CSSProperties } from "react";
+import { KeyRound } from "lucide-react";
+import { WalletControl } from "../wallet/WalletControl";
 import { useWallet } from "../wallet/useWallet";
 import { useWalletClient } from "wagmi";
 import { payX402, ensureGatewayFloat } from "@/lib/gatewayBrowser";
@@ -14,26 +13,7 @@ import { usePasskey } from "../wallet/passkey";
 import { VerdictWatch } from "./VerdictWatch";
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
-const pct = (c: number) => `${Math.round(c * 100)}%`;
-const ENTER = "animate-in fade-in slide-in-from-bottom-2 duration-300";
-
-function Label({ text, color, icon: Icon }: { text: string; color: string; icon?: LucideIcon }) {
-  return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.22em", color }}>
-      {Icon ? <Icon size={13} strokeWidth={2} aria-hidden="true" /> : <span style={{ width: 20, height: 1, background: "currentColor" }} />}
-      {text}
-    </div>
-  );
-}
-
-function Row({ label, value, tone, strong }: { label: string; value: ReactNode; tone?: string; strong?: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: strong ? "12px 0" : "8px 0", borderTop: "1px solid var(--border)" }}>
-      <span style={{ fontSize: 13, color: strong ? "var(--foreground)" : "var(--muted-foreground)", fontWeight: strong ? 500 : 400 }}>{label}</span>
-      <span style={{ ...mono, fontSize: strong ? 16 : 14, fontWeight: 500, color: tone || "var(--foreground)" }}>{value}</span>
-    </div>
-  );
-}
+const fx = (n: number) => n.toFixed(3);
 
 type ExecuteResult = {
   match_id: string; match_key: string; status: string; deliverable?: unknown;
@@ -43,15 +23,14 @@ type ExecuteResult = {
 /* Render a deliverable readably. Providers return { provider, answer } — show the `answer` as prose;
    if it's itself JSON (e.g. the sidecar's settlement statement) pretty-print that; else raw JSON. */
 function Deliverable({ value }: { value: unknown }) {
-  const box: CSSProperties = { margin: "14px 0 0", padding: 12, background: "var(--muted)", borderRadius: "var(--radius)", fontSize: 12.5, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" };
   const answer = value && typeof value === "object" && "answer" in value && typeof (value as { answer?: unknown }).answer === "string"
     ? (value as { answer: string }).answer : undefined;
   if (answer !== undefined) {
     let pretty: string | null = null;
     try { const p = JSON.parse(answer); if (p && typeof p === "object") pretty = JSON.stringify(p, null, 2); } catch { /* prose */ }
-    return <pre style={{ ...box, fontFamily: pretty ? "var(--font-mono)" : "var(--font-body)", lineHeight: 1.55 }}>{pretty ?? answer}</pre>;
+    return <pre className="code" style={{ marginTop: 14, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: pretty ? "var(--font-mono)" : "var(--font-ui)" }}>{pretty ?? answer}</pre>;
   }
-  return <pre style={{ ...box }}>{JSON.stringify(value, null, 2)}</pre>;
+  return <pre className="code" style={{ marginTop: 14, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(value, null, 2)}</pre>;
 }
 
 export function QuoteCard({ output }: { output: Record<string, unknown> }) {
@@ -63,30 +42,22 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
   const [result, setResult] = useState<ExecuteResult | null>(null);
 
   if (output.error) {
-    return (
-      <div className={ENTER}>
-        <Card padding={16} style={{ maxWidth: "min(460px, 100%)" }}>
-          <span style={{ fontSize: 13, color: "var(--muted-foreground)" }}>{String(output.error)}</span>
-        </Card>
-      </div>
-    );
+    return <div className="quote-card" style={{ borderColor: "var(--line)" }}><span className="small muted">{String(output.error)}</span></div>;
   }
 
   if (output.declined) {
     return (
-      <div className={ENTER}>
-        <Card padding={18} style={{ borderColor: "color-mix(in oklab, var(--destructive) 45%, var(--border))", maxWidth: "min(460px, 100%)" }}>
-          <Label text="Declined" color="var(--destructive)" icon={Scale} />
-          <p style={{ margin: "12px 0 0", fontSize: 15, lineHeight: 1.5, color: "var(--foreground)", textWrap: "pretty" }}>
-            {String(output.reason ?? "I won't bond this one — the spec is underspecified and I can't price my confidence honestly.")}
-          </p>
-          <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--muted-foreground)" }}>No bond, no charge. Refine the ask and I&apos;ll quote again.</p>
-        </Card>
+      <div className="quote-card" style={{ borderColor: "var(--line)" }}>
+        <div className="quote-head" style={{ color: "var(--muted)" }}>Declined</div>
+        <p style={{ margin: "10px 0 0", fontSize: "var(--text-sm)", lineHeight: 1.5, color: "var(--ink)", textWrap: "pretty" }}>
+          {String(output.reason ?? "I won't bond this one — the spec is underspecified and I can't price my confidence honestly.")}
+        </p>
+        <p className="small muted" style={{ margin: "8px 0 0" }}>No bond, no charge. Refine the ask and I&apos;ll quote again.</p>
       </div>
     );
   }
 
-  const q = output as { quote_id: string; action: "accept" | "best_effort_offer"; confidence: number; bond_usdc: number; total_price_usdc: number; expires_at: string };
+  const q = output as { quote_id: string; action: "accept" | "best_effort_offer"; provider_name?: string; confidence: number; bond_usdc: number; total_price_usdc: number; expires_at: string };
   const bonded = q.action === "accept";
   const passkey = wallet.kind === "passkey";
 
@@ -110,91 +81,68 @@ export function QuoteCard({ output }: { output: Record<string, unknown> }) {
 
   if (result) {
     const steps = bonded
-      ? [
-          { label: "Bond posted", done: true },
-          { label: "Provider paid", done: true },
-          { label: "Deliverable ready", done: !!result.deliverable },
-        ]
-      : [
-          { label: "Provider paid", done: true },
-          { label: "Deliverable ready", done: !!result.deliverable },
-        ];
+      ? [{ label: "Bond posted", done: true }, { label: "Provider paid", done: true }, { label: "Deliverable ready", done: !!result.deliverable }]
+      : [{ label: "Provider paid", done: true }, { label: "Deliverable ready", done: !!result.deliverable }];
     return (
-      <div className={ENTER}>
-        <Card stele={bonded} padding={18} style={{ maxWidth: "min(460px, 100%)" }}>
-          <Label text={bonded ? "Accepted · bonded" : "Accepted"} color={bonded ? "var(--ring)" : "var(--muted-foreground)"} icon={bonded ? Coins : undefined} />
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 6, margin: "12px 0 14px" }}>
-            <span style={{ fontSize: 15, fontWeight: 500 }}>Task</span>
-            {bonded && <span style={{ ...mono, fontSize: 14, color: "var(--ring)" }}>{q.bond_usdc} USDC staked</span>}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {steps.map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}>
-                <span style={{ width: 18, height: 18, borderRadius: 999, display: "grid", placeItems: "center", background: s.done ? "var(--success)" : "transparent", border: s.done ? "none" : "2px solid var(--border)", flexShrink: 0 }}>
-                  {s.done && <Check size={11} color="var(--success-foreground)" strokeWidth={3} aria-hidden="true" />}
-                </span>
-                <span style={{ color: s.done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
-              </div>
-            ))}
-          </div>
-          {result.deliverable !== undefined && <Deliverable value={result.deliverable} />}
-          <div style={{ marginTop: 14 }}>
-            {result.status === "delivered_awaiting_verdict" && result.verdict_due_at
-              ? <VerdictWatch matchKey={result.match_key} dueAt={result.verdict_due_at} bondTx={result.bond_tx} />
-              : <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>delivered (best-effort tier — no bond, no public verdict)</div>}
-          </div>
-        </Card>
+      <div className="quote-card">
+        {bonded && <div className="quote-head">Accepted · bonded</div>}
+        {!bonded && <div className="quote-head" style={{ color: "var(--muted)" }}>Accepted</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "baseline", gap: 6, margin: "12px 0 14px" }}>
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>Task underwritten</span>
+          {bonded && <span style={{ ...mono, fontSize: "var(--text-sm)", color: "var(--accent-ink)" }}>{fx(q.bond_usdc)} USDC staked</span>}
+        </div>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {steps.map((s, i) => (
+            <li key={i} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "var(--text-sm)", color: s.done ? "var(--ink)" : "var(--muted)" }}>
+              <span style={{ color: s.done ? "var(--pass)" : "var(--muted)", fontFamily: "var(--font-mono)" }}>{s.done ? "✓" : "·"}</span>
+              {s.label}
+            </li>
+          ))}
+        </ul>
+        {result.deliverable !== undefined && <Deliverable value={result.deliverable} />}
+        <div style={{ marginTop: 14 }}>
+          {result.status === "delivered_awaiting_verdict" && result.verdict_due_at
+            ? <VerdictWatch matchKey={result.match_key} dueAt={result.verdict_due_at} bondTx={result.bond_tx} />
+            : <div className="small muted">delivered (best-effort tier — no bond, no public verdict)</div>}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={ENTER}>
-      <Card stele={bonded} padding={18} style={{ maxWidth: "min(460px, 100%)" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "4px 12px" }}>
-          <Label
-            text={bonded ? "Bonded quote" : "Best effort — no bond"}
-            color={bonded ? "var(--ring)" : "var(--muted-foreground)"}
-            icon={bonded ? Coins : undefined}
-          />
-          <span style={{ fontSize: 11, color: "var(--muted-foreground)", whiteSpace: "nowrap" }}>expires {new Date(q.expires_at).toLocaleTimeString()}</span>
-        </div>
-
-        {bonded && (
-          <p style={{ margin: "12px 0 0", fontSize: 14.5, color: "var(--muted-foreground)", fontStyle: "italic", fontFamily: "var(--font-greek)" }}>
-            The oracle says {pct(q.confidence)}. Care to disagree?
-          </p>
-        )}
-
-        <div style={{ marginTop: 8 }}>
-          <Row label="Price" value={`${q.total_price_usdc} USDC`} />
-          <Row label="Broker confidence" value={pct(q.confidence)} />
-          {bonded && <Row label="ENGYE stakes" value={`${q.bond_usdc} USDC`} tone="var(--ring)" strong />}
-        </div>
-
-        {bonded && (
-          <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden", margin: "12px 0" }}>
-            <div className="bar-fill" style={{ height: "100%", width: "100%", transformOrigin: "left center", transform: `scaleX(${q.confidence})`, transition: "transform var(--dur) var(--ease)", background: "var(--accent)" }} />
-          </div>
-        )}
-
-        {wallet.connected ? (
-          <Button onClick={accept} disabled={busy} style={{ width: "100%", marginTop: bonded ? 4 : 14 }}>
-            {passkey && <KeyRound size={15} aria-hidden="true" />}
-            {busy ? "Paying…" : `Accept · ${q.total_price_usdc} USDC${passkey ? " · Passkey" : ""}`}
-          </Button>
-        ) : (
-          <div style={{ marginTop: bonded ? 4 : 14 }}>
-            <ConnectButton />
-            <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted-foreground)" }}>No wallet? A passkey account takes one tap — first tasks sponsored.</p>
-          </div>
-        )}
-        {err && <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--destructive)" }}>{err}</p>}
-
-        <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--muted-foreground)", textAlign: "center" }}>
-          {bonded ? "If the validator fails it, you're paid price + bond — on-chain." : "No bond posted. You pay the price only; no failure payout."}
+    <div className="quote-card">
+      <div className="quote-head" style={bonded ? undefined : { color: "var(--muted)" }}>{bonded ? "Bonded Quote" : "Best effort — no bond"}</div>
+      {bonded && (
+        <p className="greek" style={{ margin: "8px 0 0", fontSize: "var(--text-base)", color: "var(--muted)" }}>
+          The oracle says {q.confidence.toFixed(2)}. Care to disagree?
         </p>
-      </Card>
+      )}
+      <div className="quote-grid">
+        {q.provider_name && <div><div className="q-label">provider</div><div className="q-value">{q.provider_name}</div></div>}
+        <div><div className="q-label">calibration ĉ</div><div className="q-value">{q.confidence.toFixed(2)}</div></div>
+        <div><div className="q-label">price</div><div className="q-value">{fx(q.total_price_usdc)} USDC</div></div>
+        {bonded && <div><div className="q-label">bond</div><div className="q-value accent">{fx(q.bond_usdc)} USDC</div></div>}
+      </div>
+      <p className="small muted" style={{ margin: "0 0 0.25rem" }}>
+        {bonded ? "If the validator fails the work, you're paid price + bond — on-chain, not a support ticket." : "No bond posted. You pay the price only; no failure payout."}
+      </p>
+      {wallet.connected ? (
+        <div className="quote-actions">
+          <button className="btn btn-primary" type="button" onClick={accept} disabled={busy} aria-disabled={busy}>
+            {passkey && <KeyRound size={14} aria-hidden="true" />}
+            {busy ? "Paying…" : `Accept · ${fx(q.total_price_usdc)} USDC${passkey ? " · Passkey" : ""}`}
+          </button>
+        </div>
+      ) : (
+        <div className="quote-actions" style={{ flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
+          <WalletControl />
+          <p className="small muted" style={{ margin: 0 }}>No wallet? A passkey account takes one tap — first tasks sponsored.</p>
+        </div>
+      )}
+      <div className="small" style={{ marginTop: 8, display: "flex", justifyContent: "space-between", gap: 8 }}>
+        {err ? <span style={{ color: "var(--slash)" }}>{err}</span> : <span />}
+        <span className="muted">expires {new Date(q.expires_at).toLocaleTimeString()}</span>
+      </div>
     </div>
   );
 }
