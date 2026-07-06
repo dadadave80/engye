@@ -2,17 +2,20 @@
 // Porto-style connect modal: Continue with Porto (passkey) · Switch account · Sign up,
 // plus a browser-wallet (EOA) option for the x402 pay flow. Backed by the Porto Key +
 // self-relay flow (the authentic id.porto.sh dialog can't serve Arc — see the design note).
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useConnect } from "wagmi";
+import { useConnect, useConnectors, type Connector } from "wagmi";
 import { injected } from "wagmi/connectors";
+import { createWalletClient, custom } from "viem";
+import { arcTestnet } from "viem/chains";
 import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } from "lucide-react";
 import { usePasskey, type PasskeySession } from "./passkey";
 import { EXTERNAL_WALLETS_ENABLED } from "./useWallet";
 import { signUpPasskey, loginPasskey } from "./passkeyClient";
-import { circleConfigured, isValidMnemonic, recoverWithMnemonic } from "@/lib/circleWallet";
+import { circleConfigured, recoverWithWallet } from "@/lib/circleWallet";
 
 const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const genRecoveryUsername = () => `ENGYE-rec-${Math.random().toString(36).slice(2, 8)}`; // module scope: keeps Math.random out of the component body
 
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 };
 const card: React.CSSProperties = { width: 380, maxWidth: "92vw", background: "var(--popover)", color: "var(--popover-foreground)", border: "1px solid var(--border)", borderRadius: "calc(var(--radius) * 1.5)", boxShadow: "var(--shadow-popover)", overflow: "hidden", fontFamily: "var(--font-body)" };
@@ -23,11 +26,20 @@ const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantN
 export function ConnectModal({ onClose }: { onClose: () => void }) {
   const { accounts, current, addAccount, switchTo } = usePasskey();
   const { connect } = useConnect();
+  const connectors = useConnectors();
   const [view, setView] = useState<"main" | "switch" | "recover">("main");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const [phrase, setPhrase] = useState("");
+
+  // installed wallets for the recovery flow (EIP-6963-announced, deduped by name)
+  const recoveryWallets = useMemo(() => {
+    const seen = new Set<string>();
+    const withIcon = connectors.filter((c) => !!c.icon && !seen.has(c.name) && (seen.add(c.name), true));
+    if (withIcon.length) return withIcon;
+    const inj = connectors.find((c) => c.type === "injected");
+    return inj && typeof window !== "undefined" && "ethereum" in window ? [inj] : [];
+  }, [connectors]);
   // Circle username rule: 5–50 chars, alphanumeric + _@.:+- (an email fits; it becomes the passkey's
   // identity in Google Password Manager / the authenticator).
   const emailOk = /^[A-Za-z0-9_@.:+-]{5,50}$/.test(email.trim());
@@ -54,13 +66,19 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
     else run(loginPasskey); // returning user, no local session → pick an existing passkey
   }
 
-  // Restore a lost passkey from the recovery phrase: mint a fresh passkey and swap the account owner.
-  async function doRecover() {
-    if (!isValidMnemonic(phrase)) { setErr("That doesn't look like a valid recovery phrase."); return; }
+  // Restore a lost passkey: connect the registered recovery wallet, mint a fresh passkey, and have
+  // the wallet sign the swap of the account owner to it.
+  async function doRecover(c: Connector) {
     setBusy(true); setErr(null);
     try {
-      const username = `ENGYE-rec-${Math.random().toString(36).slice(2, 8)}`;
-      const { credential, address } = await recoverWithMnemonic(phrase, username);
+      const provider = (await c.getProvider()) as { request: (a: { method: string }) => Promise<unknown> };
+      const accountsRes = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const addr = accountsRes?.[0] as `0x${string}` | undefined;
+      if (!addr) throw new Error("The wallet returned no account.");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const walletClient = createWalletClient({ account: addr, chain: arcTestnet, transport: custom(provider as any) });
+      const username = genRecoveryUsername();
+      const { credential, address } = await recoverWithWallet(walletClient, username);
       addAccount({ address, credential, label: username });
       onClose();
     } catch (e) {
@@ -107,12 +125,26 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
         ) : view === "recover" ? (
           <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ fontSize: 16, fontWeight: 600 }}>Recover a lost passkey</div>
-            <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5 }}>Enter the recovery phrase you saved when you set up this account. We&apos;ll create a new passkey on this device and hand it control of your account — gas is sponsored.</p>
-            <textarea value={phrase} onChange={(e) => setPhrase(e.target.value)} rows={3} placeholder="your twelve recovery words, separated by spaces" aria-label="Recovery phrase"
-              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 13, fontFamily: "var(--font-mono)", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none", resize: "vertical" }} />
-            <button style={{ ...primaryBtn, opacity: busy ? 0.7 : 1 }} disabled={busy} onClick={doRecover}>
-              <ScanFace size={16} /> {busy ? "Recovering…" : "Recover account"}
-            </button>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5 }}>Connect the wallet you registered as a recovery key. It signs a swap that hands your account to a new passkey on this device — gas is sponsored.</p>
+            {recoveryWallets.length === 0 ? (
+              <div style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.6, textAlign: "center", padding: "8px 0" }}>
+                No wallet detected here. Open this page in the browser (or wallet app) where your recovery wallet lives, then try again.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {recoveryWallets.map((c) => (
+                  <button key={c.uid} disabled={busy} onClick={() => doRecover(c)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "transparent", cursor: "pointer", color: "var(--foreground)", fontSize: 14 }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {c.icon ? <img src={c.icon} alt="" width={20} height={20} style={{ borderRadius: 6 }} /> : <Wallet size={16} />}
+                      {c.name}
+                    </span>
+                    {busy ? <span style={{ fontSize: 12, color: "var(--muted-foreground)" }}>recovering…</span> : <ChevronRight size={16} color="var(--muted-foreground)" />}
+                  </button>
+                ))}
+              </div>
+            )}
             <button style={{ ...link, alignSelf: "center" }} onClick={() => { setView("main"); setErr(null); }}>← Back</button>
             {err && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)" }}>{err}</div>}
           </div>
@@ -159,7 +191,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            {configured && <button style={{ ...link, alignSelf: "center", fontSize: 12.5 }} onClick={() => { setErr(null); setPhrase(""); setView("recover"); }}>Lost your passkey? Recover with your phrase</button>}
+            {configured && <button style={{ ...link, alignSelf: "center", fontSize: 12.5 }} onClick={() => { setErr(null); setView("recover"); }}>Lost your passkey? Recover with a wallet</button>}
 
             {/* browser wallet (EOA) — hidden this version (passkey-only); flip EXTERNAL_WALLETS_ENABLED
                 in useWallet to restore. Mobile browsers have no injected provider — the real path is

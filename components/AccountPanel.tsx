@@ -8,7 +8,7 @@ import { ExternalLink, Copy, Check, ChevronDown, ChevronRight, ShieldCheck } fro
 import { Card, Button, Eyebrow } from "./ui/primitives";
 import { ConnectGate } from "./ConnectGate";
 import { RecoveryModal } from "./wallet/RecoveryModal";
-import { hasRecoverySet } from "./wallet/recoveryStore";
+import { getRecoveryAddress } from "./wallet/recoveryStore";
 import { useWallet } from "./wallet/useWallet";
 import { usePasskey } from "./wallet/passkey";
 import { publicClient, USDC, PROVIDER_STAKE, erc20Abi, providerStakeAbi, fromAtomic, ARCSCAN } from "@/lib/clientChain";
@@ -46,7 +46,7 @@ export function AccountPanel() {
   const [usdc, setUsdc] = useState<bigint>(0n);
   const [staked, setStaked] = useState<bigint>(0n);
   const [copied, setCopied] = useState(false);
-  const [recoverySet, setRecoverySet] = useState(false);
+  const [recoveryAddr, setRecoveryAddr] = useState<string | null>(null);
   const [showRecovery, setShowRecovery] = useState(false);
 
   const load = useCallback(async () => {
@@ -63,7 +63,7 @@ export function AccountPanel() {
   // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setState runs after await
   useEffect(() => { void load(); }, [load]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage read (client only)
-  useEffect(() => { if (address) setRecoverySet(hasRecoverySet(address)); }, [address]);
+  useEffect(() => { if (address) setRecoveryAddr(getRecoveryAddress(address)); }, [address]);
 
   function copy() {
     if (!address) return;
@@ -128,23 +128,23 @@ export function AccountPanel() {
         {/* Recovery — register a BIP-39 phrase so a lost passkey never locks the account */}
         <Section title="Recovery" action={
           isPasskey && current
-            ? <Button size="sm" variant="outline" onClick={() => setShowRecovery(true)}>{recoverySet ? "Rotate phrase" : "Set up recovery"}</Button>
+            ? <Button size="sm" variant="outline" onClick={() => setShowRecovery(true)}>{recoveryAddr ? "Change recovery key" : "Register a recovery key"}</Button>
             : undefined
         }>
           {!isPasskey ? (
             <div style={empty}>Recovery is available for passkey accounts.</div>
-          ) : recoverySet ? (
+          ) : recoveryAddr ? (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0" }}>
               <ShieldCheck size={18} color="var(--success)" style={{ flexShrink: 0, marginTop: 1 }} />
               <span style={{ fontSize: 13, lineHeight: 1.5 }}>
-                <b>Recovery is active.</b> A recovery phrase is registered on-chain. Keep it safe — if you lose this device, choose <b>&ldquo;Recover a lost passkey&rdquo;</b> when connecting and enter the phrase.
+                <b>Recovery is active.</b> Wallet <span style={mono}>{trunc(recoveryAddr)}</span> is registered as a recovery key — if you lose this device, choose <b>&ldquo;Recover a lost passkey&rdquo;</b> when connecting and sign with that wallet.
               </span>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0" }}>
               <ShieldCheck size={18} color="var(--muted-foreground)" style={{ flexShrink: 0, marginTop: 1 }} />
               <span style={{ fontSize: 13, lineHeight: 1.5, color: "var(--muted-foreground)" }}>
-                No recovery yet. This account lives only on this device&apos;s passkey — set up a recovery phrase so a lost or wiped device doesn&apos;t lock you out for good.
+                No recovery yet. This account lives only on this device&apos;s passkey — register a wallet you control as a recovery key so a lost or wiped device doesn&apos;t lock you out for good.
               </span>
             </div>
           )}
@@ -152,7 +152,7 @@ export function AccountPanel() {
       </div>
 
       {showRecovery && current && (
-        <RecoveryModal session={current} onClose={() => setShowRecovery(false)} onDone={() => { if (address) setRecoverySet(true); }} />
+        <RecoveryModal session={current} onClose={() => setShowRecovery(false)} onDone={(addr) => setRecoveryAddr(addr)} />
       )}
     </Card>
   );

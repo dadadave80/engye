@@ -1,51 +1,52 @@
 "use client";
-// Passkey recovery SETUP (Circle Modular Wallets). Generates a BIP-39 phrase in the browser, shows
-// it ONCE (never sent anywhere), and — after the user confirms they saved it — registers the phrase's
-// EOA as a recovery owner on their MSCA (gasless). If the passkey is ever lost, that phrase restores
-// the account via ConnectModal's "recover" flow. The mnemonic never leaves the client.
-import { useState } from "react";
+// Passkey recovery SETUP — register an EOA WALLET OF THE USER'S CHOICE as a recovery key on their
+// Circle MSCA. Pick an installed wallet (EIP-6963), read its address (no persistent connection — the
+// passkey signs the on-chain registration, the wallet just supplies its address), then
+// registerRecovery. If the passkey is ever lost, that wallet signs the restore in ConnectModal.
+import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Copy, Check, ShieldCheck } from "lucide-react";
-import { generateRecovery, registerRecovery } from "@/lib/circleWallet";
+import { useConnectors, type Connector } from "wagmi";
+import { X, ShieldCheck, ChevronRight } from "lucide-react";
+import { registerRecovery } from "@/lib/circleWallet";
 import { ARCSCAN } from "@/lib/clientChain";
-import { markRecoverySet } from "./recoveryStore";
+import { setRecoveryAddress } from "./recoveryStore";
 import type { PasskeySession } from "./passkey";
 
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 };
-const card: React.CSSProperties = { width: 440, maxWidth: "94vw", maxHeight: "90vh", overflowY: "auto", background: "var(--card)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow)", fontFamily: "var(--font-ui)" };
-const mono: React.CSSProperties = { fontFamily: "var(--font-mono)" };
+const card: React.CSSProperties = { width: 420, maxWidth: "94vw", maxHeight: "90vh", overflowY: "auto", background: "var(--card)", color: "var(--ink)", border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow)", fontFamily: "var(--font-ui)" };
+const walletRow: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "12px 14px", borderRadius: "var(--radius-md)", border: "1px solid var(--line)", background: "transparent", cursor: "pointer", color: "var(--ink)", fontSize: "var(--text-sm)" };
+const trunc = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-export function RecoveryModal({ session, onClose, onDone }: { session: PasskeySession; onClose: () => void; onDone: () => void }) {
-  // generate the phrase once, synchronously, on first (client-only) render — the modal never SSRs
-  const [gen] = useState<{ mnemonic: string; recoveryAddress: `0x${string}` } | null>(() => {
-    try { return generateRecovery(); } catch { return null; }
-  });
-  const phrase = gen?.mnemonic ?? null;
-  const recoveryAddress = gen?.recoveryAddress ?? null;
-  const [saved, setSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(gen ? null : "Couldn't generate a recovery phrase in this browser.");
-  const [tx, setTx] = useState<string | null>(null);
+export function RecoveryModal({ session, onClose, onDone }: { session: PasskeySession; onClose: () => void; onDone: (recoveryAddress: string) => void }) {
+  const connectors = useConnectors();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<{ addr: string; tx: string } | null>(null);
 
-  const words = phrase ? phrase.split(" ") : [];
+  // EIP-6963-announced wallets carry an icon; dedupe by name.
+  const wallets = useMemo(() => {
+    const seen = new Set<string>();
+    return connectors.filter((c) => !!c.icon && !seen.has(c.name) && (seen.add(c.name), true));
+  }, [connectors]);
+  const hasInjected = typeof window !== "undefined" && "ethereum" in window;
+  const fallback = wallets.length === 0 && hasInjected ? connectors.find((c) => c.type === "injected") : undefined;
+  const shown = wallets.length ? wallets : fallback ? [fallback] : [];
 
-  async function copy() {
-    if (!phrase) return;
-    try { await navigator.clipboard.writeText(phrase); } catch { /* clipboard blocked — user can select manually */ }
-    setCopied(true); setTimeout(() => setCopied(false), 1400);
-  }
-
-  async function activate() {
-    if (!recoveryAddress) return;
-    setBusy(true); setErr(null);
+  async function pick(c: Connector) {
+    setBusy(c.uid); setErr(null);
     try {
-      const hash = await registerRecovery(session.credential, recoveryAddress);
-      markRecoverySet(session.address);
-      setTx(hash);
-      onDone();
-    } catch (e) { setErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
-    finally { setBusy(false); }
+      const provider = (await c.getProvider()) as { request: (a: { method: string }) => Promise<unknown> };
+      const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+      const addr = accounts?.[0];
+      if (!addr) throw new Error("The wallet returned no account.");
+      if (addr.toLowerCase() === session.address.toLowerCase()) throw new Error("That's this passkey account — pick a different wallet.");
+      const tx = await registerRecovery(session.credential, addr as `0x${string}`);
+      setRecoveryAddress(session.address, addr);
+      setDone({ addr, tx });
+      onDone(addr);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message.split("\n")[0] : String(e));
+    } finally { setBusy(null); }
   }
 
   if (typeof document === "undefined") return null;
@@ -54,46 +55,42 @@ export function RecoveryModal({ session, onClose, onDone }: { session: PasskeySe
       <div style={card} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid var(--line)" }}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--text-sm)", fontWeight: 600 }}>
-            <ShieldCheck size={16} color="var(--accent-ink)" /> Set up passkey recovery
+            <ShieldCheck size={16} color="var(--accent-ink)" /> Register a recovery key
           </span>
           <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", display: "inline-flex" }}><X size={16} /></button>
         </div>
 
         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-          {tx ? (
+          {done ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
               <span className="seal seal-pass">RECOVERY ACTIVE</span>
-              <p className="small" style={{ margin: 0, lineHeight: 1.5 }}>Your recovery phrase is registered on-chain. If you lose this passkey, choose <b>&ldquo;Recover a lost passkey&rdquo;</b> on the connect screen and enter the phrase.</p>
-              <a className="tx-link" href={`${ARCSCAN}/tx/${tx}`} target="_blank" rel="noreferrer">view on Arcscan ↗</a>
+              <p className="small" style={{ margin: 0, lineHeight: 1.5 }}><span className="mono">{trunc(done.addr)}</span> is now a recovery key. If you lose this passkey, choose <b>&ldquo;Recover a lost passkey&rdquo;</b> when connecting and sign with that wallet.</p>
+              <a className="tx-link" href={`${ARCSCAN}/tx/${done.tx}`} target="_blank" rel="noreferrer">view on Arcscan ↗</a>
               <button className="btn btn-primary btn-sm" onClick={onClose} style={{ marginTop: 4 }}>Done</button>
             </div>
           ) : (
             <>
               <p className="small muted" style={{ margin: 0, lineHeight: 1.5 }}>
-                Write these {words.length} words down in order and keep them somewhere safe and offline. <b style={{ color: "var(--ink)" }}>This is the only way to recover your account</b> if you lose this device — anyone with the phrase can take it.
+                Choose a wallet you control (e.g. MetaMask). Its address becomes a <b style={{ color: "var(--ink)" }}>recovery key</b> — if you lose this device, that wallet can hand your account to a new passkey. Gas is sponsored.
               </p>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, background: "var(--bg-raised)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: 12 }}>
-                {words.length === 0 && !err && <span className="small muted" style={{ gridColumn: "1 / -1", textAlign: "center" }}>generating…</span>}
-                {words.map((w, i) => (
-                  <span key={i} style={{ ...mono, fontSize: "var(--text-sm)", display: "flex", gap: 6 }}>
-                    <span style={{ color: "var(--muted)", width: 16, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>{w}
-                  </span>
-                ))}
-              </div>
-
-              <button className="btn btn-ghost btn-sm" onClick={copy} disabled={!phrase} style={{ alignSelf: "flex-start" }}>
-                {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy phrase</>}
-              </button>
-
-              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: "var(--text-sm)", cursor: "pointer" }}>
-                <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} style={{ width: 16, height: 16, marginTop: 2, accentColor: "var(--accent)" }} />
-                I&apos;ve saved my recovery phrase somewhere safe. ENGYE can&apos;t recover it for me.
-              </label>
-
-              <button className="btn btn-primary" onClick={activate} disabled={!saved || busy || !recoveryAddress} aria-disabled={!saved || busy || !recoveryAddress}>
-                {busy ? "Registering on-chain…" : "Activate recovery"}
-              </button>
+              {shown.length === 0 ? (
+                <div className="small muted" style={{ textAlign: "center", lineHeight: 1.6, padding: "8px 0" }}>
+                  No wallets detected. Install a browser wallet — e.g. <b>MetaMask</b>, <b>Rabby</b>, or <b>Coinbase Wallet</b> — then reopen this.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {shown.map((c) => (
+                    <button key={c.uid} style={walletRow} disabled={busy !== null} onClick={() => pick(c)}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {c.icon ? <img src={c.icon} alt="" width={22} height={22} style={{ borderRadius: 6 }} /> : <span style={{ width: 22, height: 22, borderRadius: 6, background: "var(--bg-raised)" }} />}
+                        {c.name}
+                      </span>
+                      {busy === c.uid ? <span className="small muted">registering…</span> : <ChevronRight size={16} color="var(--muted)" />}
+                    </button>
+                  ))}
+                </div>
+              )}
               {err && <p className="small" style={{ margin: 0, color: "var(--slash)" }}>{err}</p>}
             </>
           )}
