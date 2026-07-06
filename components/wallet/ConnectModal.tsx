@@ -8,6 +8,7 @@ import { useConnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } from "lucide-react";
 import { usePasskey, type PasskeySession } from "./passkey";
+import { EXTERNAL_WALLETS_ENABLED } from "./useWallet";
 import { signUpPasskey, loginPasskey } from "./passkeyClient";
 import { circleConfigured } from "@/lib/circleWallet";
 
@@ -125,13 +126,14 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
               )
             ) : (
               <div style={{ padding: "10px 12px", borderRadius: "var(--radius)", border: "1px dashed var(--border)", fontSize: 12.5, color: "var(--muted-foreground)", lineHeight: 1.5 }}>
-                Passkey sign-in is being configured. Use a browser wallet below in the meantime.
+                Passkey sign-in is being configured{EXTERNAL_WALLETS_ENABLED ? " — use a browser wallet below in the meantime." : " — please check back shortly."}
               </div>
             )}
 
-            {/* browser wallet (EOA) — a full first-class option: fund it and pay/stake directly.
-                Mobile browsers have no injected provider (no extensions) — show the real path
-                (the wallet app's in-app browser) instead of a silently-dead button. */}
+            {/* browser wallet (EOA) — hidden this version (passkey-only); flip EXTERNAL_WALLETS_ENABLED
+                in useWallet to restore. Mobile browsers have no injected provider — the real path is
+                the wallet app's in-app browser. */}
+            {EXTERNAL_WALLETS_ENABLED && (
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
               {typeof window !== "undefined" && (window as { ethereum?: unknown }).ethereum ? (
                 <button onClick={() => { connect({ connector: injected() }); onClose(); }}
@@ -153,6 +155,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
                 New to Arc? Fund your wallet with testnet USDC — <span style={{ color: "var(--link)" }}>Circle Faucet</span> <ExternalLink size={11} /> <span>(pick Arc Testnet)</span>
               </a>
             </div>
+            )}
 
             {err && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)" }}>{err}</div>}
           </div>
