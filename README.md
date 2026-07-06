@@ -10,10 +10,13 @@ Built at the **Lepton Agents Hackathon** — Canteen × Circle × Arc.
 
 ---
 
-## The loop, in five lines
+## The loop, in one look
 
-```
-QUOTE ──▶ BOND ──▶ DELIVER ──▶ PUBLIC VERDICT (~T+2min) ──▶ AUTO-SLASH ON FAILURE
+```mermaid
+flowchart LR
+  Q[QUOTE] --> B[BOND] --> D[DELIVER] --> V["PUBLIC VERDICT · ~T+2min"] --> S{pass?}
+  S -->|yes| OK[bond released]
+  S -->|no| SLASH["AUTO-SLASH: bond + stake + refund → you"]
 ```
 
 1. **Quote** — tell ENGYE what you need (summarize a link, extract JSON, draft/rewrite something, explain or review code). It reads the provider registry and quotes a price plus an honest confidence `c`.
@@ -60,10 +63,11 @@ Live: **https://engye.vercel.app** — everything happens on the real testnet de
 
 ## The mechanism, in full
 
-```
-QUOTE ──▶ BOND ──▶ PAY ──▶ DELIVER (public) ──▶ ~2min window ──▶ VALIDATE ──▶ SETTLE
-                                                                              ├─ pass → bond released to broker
-                                                                              └─ fail → bond + stake slashed to requester, price refunded
+```mermaid
+flowchart LR
+  Q["QUOTE<br/>LLM decision 1 — route + confidence"] --> B["BOND<br/>escrow + decision hash"] --> P["PAY<br/>gasless x402"] --> D["DELIVER<br/>public /m permalink"] --> W["~2 min<br/>public window"] --> V["VALIDATE<br/>LLM decision 2 — blind"] --> S{verdict}
+  S -->|pass| R[bond released to broker]
+  S -->|fail| F["bond + provider stake → requester<br/>+ price refunded"]
 ```
 
 1. **Quote** (LLM decision #1) — the broker reads the registry (capabilities, price, calibrated pass-rate ĉ, recent outcomes) and picks a provider, stating an honest confidence `c ∈ [0.5, 0.99]`. The server re-derives every number and enforces an expected-value gate — the model never does the arithmetic.
@@ -82,27 +86,32 @@ Two USDC rails on Arc, never conflated:
 - **Rail A′ — passkey payments:** a passkey account can't sign EIP-3009 (Gateway needs `ecrecover`; a passkey has no raw private key to recover from), so it pays via a plain USDC `transfer` whose tx↔quote binding is created **server-side, before the tx hash is ever public** — closing the rebind/spoofed-token/replay attacks a bare tx-hash proof would otherwise allow.
 - **Rail B — bonds, stakes & refunds:** on-chain USDC transfers through ENGYE's Vyper contracts.
 
+```mermaid
+flowchart TD
+  H["human — /hire chat"] --> QU
+  A["agent — x402"] --> QU
+  QU["POST /api/broker/quote<br/>LLM routes + prices + sizes the bond"] -->|"Accept — wallet or passkey pay"| EX
+  subgraph phaseA["Phase A — in-request"]
+    EX["POST /api/broker/execute/:id"] --> PAY["pay ENGYE — x402 or relay-bound passkey transfer"]
+    PAY --> BOND["BondedEscrow.create_bond + decision hash — Arc"]
+    BOND --> REQ["ERC-8004 validationRequest — Arc"]
+    REQ --> PROV["Gateway x402 pays the provider — Circle"]
+    PROV --> DEL["deliverable stored → delivered_awaiting_verdict"]
+  end
+  subgraph phaseB["Phase B — ~2 min later"]
+    VAL[blind validate] --> OUT{pass?}
+    OUT -->|pass| REL[release bond]
+    OUT -->|fail| SL["slash + stake-slash + vault refund"]
+    REL --> FB["ERC-8004 response + feedback"]
+    SL --> FB
+  end
+  DEL -."verdict window".-> VAL
+  FB --> RT["supabase realtime → /hire bubble · /agora floor · /m permalink"]
+  SWEEP["permissionless POST /api/settle"] -.re-drives.-> VAL
+  CT["on-chain claim_timeout()"] -."recovery floor".-> BOND
 ```
-human (chat, /hire)                          agent (x402)
-        │                                          │
-        └──────────────┬───────────────────────────┘
-                        ▼
-          POST /api/broker/quote (LLM: route + confidence + bond)
-                        │  Accept (wallet or passkey pay)
-                        ▼
-          POST /api/broker/execute/[id]     ── Phase A (in-request):
-                pay ENGYE (x402 or relay-bound passkey transfer)
-                → BondedEscrow.create_bond (+ decision hash)        ── Arc
-                → ERC-8004 validationRequest                        ── Arc
-                → Gateway x402 pay provider (gasless)                ── Circle
-                → deliverable stored, response: delivered_awaiting_verdict
-                        │
-                        └─ Phase B (after(), ~2min later): validate → release
-                           │ slash + stake-slash + vault refund → ERC-8004 feedback   ── Arc
-          fallbacks: permissionless POST /api/settle  →  on-chain claim_timeout()
-                        ▼
-          supabase realtime → verdict bubble in /hire · /agora floor · /m/[matchKey]
-```
+
+The full deep-dive — the two money rails, the match sequence diagram, the guarded state machine, and the module seams — lives in **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 **Stack:** Next.js 16 (App Router) · Bun · [eve](https://www.npmjs.com/package/eve) `0.19.0` (chat transport for `/hire` only) · Supabase (persistence + realtime) · viem · Vyper 0.4.3 + Foundry · Groq (per-role: broker/chat `gpt-oss-120b`, validator/demand `gpt-oss-20b`, failover `qwen3-32b`).
 
