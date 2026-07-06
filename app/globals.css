@@ -1,253 +1,1242 @@
 /* @import rules must precede everything else in the GENERATED css — Tailwind v4 inlines
    `@import "tailwindcss"` into real rules, so this Google Fonts @import must come FIRST or
    Turbopack's dev CSS parser rejects it ("@import must precede all rules"). */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=EB+Garamond:ital,wght@1,400;1,500&family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
-/* ===== tokens/colors.css — two editorial modes, one token set ===== */
+/* ============================================================
+   ENGYE — design system (handoff: design_handoff_engye_site/app/engye-theme.css,
+   adopted near-verbatim; class names are the stable API).
+   Ink (#1B1815) dark default + Pentelic stone (#EAE7E0) light, driven by
+   [data-theme] on <html>. Accent = oxidized verdigris. Cinnabar ONLY when
+   money is destroyed. No gold (--gold* are legacy aliases of --accent*).
+   ============================================================ */
+
+/* ---------- 1. Tokens ---------- */
+
 :root {
-  --marble: #F2EDE0; --ink: #191511; --clay: #A0421F; --gold: #B7892C;
-  --laurel: #4F6B3A; --oxblood: #7E2318; --aegean: #26547C;
-  --clay-lifted: #C3562B; --gold-lifted: #CBA14A; --laurel-soft: #8FAE72;
-  --laurel-badge: #A9C48F; --oxblood-lifted: #B04A36; --oxblood-badge: #D98D7E; --aegean-lifted: #6E9CC4;
+  /* palette — dark (brand default: the landing's ink panels) */
+  --bg: #1B1815;
+  --bg-raised: #221E18;
+  --card: #211D17;
+  --card-2: #262119;
+  --line: #383329;
+  --line-strong: #4E463A;
+  --ink: #EAE7E0;
+  --ink-soft: #CFC9BE;
+  --muted: #9D968A;
+  --accent: #93A58C;          /* verdigris, lifted for ink ground */
+  --accent-bright: #A8B8A1;
+  --accent-ink: #93A58C;
+  --accent-wash: rgba(147, 165, 140, 0.10);
+  --pass: #93A58C;            /* settle-good IS verdigris (landing) */
+  --pass-wash: rgba(147, 165, 140, 0.12);
+  --slash: #D96A57;           /* cinnabar lifted — money destroyed, nothing else */
+  --slash-wash: rgba(217, 106, 87, 0.12);
+  --open: #9D968A;            /* neutral — open is not an outcome */
+  --open-wash: rgba(157, 150, 138, 0.10);
+  --btn-primary-bg: #EAE7E0;  /* stone-fill CTA on ink (landing inversion) */
+  --btn-primary-ink: #1B1815;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --scrim: rgba(27, 24, 21, 0.6);
 
-  --background: #F2EDE0; --foreground: #191511;
-  --card: #F7F3E9; --card-foreground: #191511;
-  --popover: #F7F3E9; --popover-foreground: #191511;
-  --primary: #191511; --primary-foreground: #F2EDE0;
-  --secondary: #E7E0CF; --secondary-foreground: #191511;
-  --muted: #E9E3D3; --muted-foreground: #5C554B;
-  --accent: #A0421F; --accent-foreground: #F7F3E9;
-  --destructive: #7E2318; --destructive-foreground: #F7F3E9;
-  --success: #4F6B3A; --success-foreground: #F7F3E9;
-  --link: #26547C;
-  --border: color-mix(in oklab, #191511 14%, transparent);
-  --input: var(--border); --ring: #B7892C;
-  --chart-1: #A0421F; --chart-2: #4F6B3A; --chart-3: #B7892C; --chart-4: #26547C; --chart-5: #5C554B;
+  /* legacy aliases — the prototype's gold is verdigris now */
+  --gold: var(--accent);
+  --gold-bright: var(--accent-bright);
+  --gold-ink: var(--accent-ink);
+  --gold-wash: var(--accent-wash);
 
-  --radius: 0.375rem;
-  --shadow-popover: 0 2px 16px rgb(0 0 0 / 0.10);
-  --dur-fast: 120ms; --dur: 200ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+  /* type — landing voices */
+  --font-display: "Cinzel", Georgia, serif;          /* inscriptions, wordmark, seals ONLY */
+  --font-ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-greek: "EB Garamond", Georgia, serif;       /* ἐγγύη + quotes, italic */
 
-  --font-display: "Cinzel", serif;
-  --font-body: "Geist", system-ui, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, monospace;
-  --font-greek: "EB Garamond", Georgia, serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.375rem;
+  --text-h2: clamp(1.4rem, 1.1rem + 1.4vw, 1.9rem);
+  --text-h1: clamp(1.9rem, 1.4rem + 2.4vw, 2.9rem);
 
+  /* rhythm */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-section: clamp(4rem, 3rem + 4vw, 7rem);
+
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-full: 999px;
+
+  --container: 1120px;
+
+  /* motion — landing ease; flips stay under 300ms */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 140ms;
+  --dur-ui: 220ms;
+
+  color-scheme: dark;
+
+  /* ---- compat bridge: vocab-1 names (used by the 8 app routes' inline styles)
+     mapped onto engye tokens, so every not-yet-reskinned surface renders in the
+     new palette. Retire each alias as its consumers migrate to handoff classes. */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: var(--card);
+  --popover-foreground: var(--ink);
+  --primary: var(--btn-primary-bg);
+  --primary-foreground: var(--btn-primary-ink);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--bg);
+  --destructive: var(--slash);
+  --destructive-foreground: var(--bg);
+  --success: var(--pass);
+  --success-foreground: var(--bg);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--accent);
+  --link: var(--accent-ink);
+  --shadow-popover: var(--shadow);
+  --radius: var(--radius-lg);
+  --font-body: var(--font-ui);
+  --laurel: var(--pass);
+  --laurel-soft: var(--pass);
+  --laurel-badge: var(--pass);
+  --oxblood: var(--slash);
+  --oxblood-lifted: var(--slash);
+  --oxblood-badge: var(--slash);
+  --gold-lifted: var(--accent-bright);
+  --aegean: var(--accent-ink);
+  --aegean-lifted: var(--accent-bright);
+  --dur: var(--dur-ui);
+  --ease: var(--ease-out);
+  --tracking-display: 0.06em;
+  --tracking-eyebrow: 0.25em;
   --text-hero: clamp(3rem, 8vw, 7.5rem);
   --text-section: clamp(2rem, 4vw, 3rem);
   --text-subhead: 1.5rem;
-  --text-body: 1rem; --text-table: 0.875rem; --text-caption: 0.8125rem;
-  --tracking-display: 0.06em; --tracking-eyebrow: 0.25em;
-
-  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
-  --space-6: 24px; --space-8: 32px; --space-12: 48px; --space-16: 64px; --space-28: 112px;
+  --chart-1: var(--accent);
 }
 
-.dark {
-  --background: #191511; --foreground: #EDE7D8;
-  --card: #211C16; --card-foreground: #EDE7D8;
-  --popover: #211C16; --popover-foreground: #EDE7D8;
-  --primary: #EDE7D8; --primary-foreground: #191511;
-  --secondary: #2A241D; --secondary-foreground: #EDE7D8;
-  --muted: #2A241D; --muted-foreground: #A79D8C;
-  --accent: #C3562B; --accent-foreground: #191511;
-  --destructive: #B04A36; --destructive-foreground: #191511;
-  --success: #8FAE72; --success-foreground: #191511;
-  --link: #6E9CC4;
-  --border: color-mix(in oklab, #EDE7D8 14%, transparent);
-  --input: var(--border); --ring: #CBA14A;
-  --chart-1: #C3562B; --chart-2: #8FAE72; --chart-3: #CBA14A; --chart-4: #6E9CC4; --chart-5: #A79D8C;
+:root[data-theme="light"] {
+  /* palette — light ("Pentelic marble" = the landing's stone ground) */
+  --bg: #EAE7E0;
+  --bg-raised: #E3DFD6;
+  --card: #F1EFE9;
+  --card-2: #F6F4EE;
+  --line: #D3CEC2;
+  --line-strong: #B9B2A2;
+  --ink: #1B1815;
+  --ink-soft: #45413A;
+  --muted: #6B665D;
+  --accent: #48573F;          /* verdigris deep — ≥4.5:1 on stone */
+  --accent-bright: #3A4733;
+  --accent-ink: #48573F;
+  --accent-wash: rgba(110, 127, 104, 0.10);
+  --pass: #48573F;
+  --pass-wash: rgba(110, 127, 104, 0.12);
+  --slash: #B03A2E;
+  --slash-wash: rgba(176, 58, 46, 0.10);
+  --open: #6B665D;
+  --open-wash: rgba(107, 102, 93, 0.08);
+  --btn-primary-bg: #1B1815;  /* ink-fill CTA on stone (landing) */
+  --btn-primary-ink: #EAE7E0;
+  --shadow: 0 1px 2px rgba(46, 42, 34, 0.10);
+  --scrim: rgba(27, 24, 21, 0.35);
+
+  color-scheme: light;
 }
 
+/* Tailwind v4 color mapping — the few utility-class consumers resolve to the
+   aliased engye tokens above. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--btn-primary-bg);
+  --color-primary-foreground: var(--btn-primary-ink);
+  --color-secondary: var(--bg-raised);
+  --color-secondary-foreground: var(--ink);
   --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --font-sans: var(--font-body);
+  --color-accent-foreground: var(--bg);
+  --color-destructive: var(--slash);
+  --color-success: var(--pass);
+  --color-border: var(--line);
+  --color-input: var(--line-strong);
+  --color-ring: var(--accent);
+  --color-muted: var(--card-2);
+  --color-muted-foreground: var(--muted);
+  --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);
 }
 
+/* ---------- 2. Base ---------- */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; max-width: 100%; overflow-x: hidden; }
+
 body {
-  font-family: var(--font-body);
-  background: var(--background);
-  color: var(--foreground);
   margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
-/* ===== typography utilities ===== */
-.text-hero { font-family: var(--font-display); font-weight: 700; font-size: var(--text-hero); letter-spacing: var(--tracking-display); line-height: 1.05; }
-.text-section { font-family: var(--font-display); font-weight: 600; font-size: var(--text-section); letter-spacing: var(--tracking-display); line-height: 1.15; }
-.text-subhead { font-family: var(--font-body); font-weight: 500; font-size: var(--text-subhead); line-height: 1.35; }
-.text-greek { font-family: var(--font-greek); font-style: italic; }
-.text-data { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+img, svg, video, canvas { max-width: 100%; }
 
+/* Only animate theme swaps after first paint (js adds .theme-anim) */
+.theme-anim body,
+.theme-anim .card,
+.theme-anim .site-header,
+.theme-anim .btn,
+.theme-anim .table-wrap {
+  transition: background-color var(--dur-ui) var(--ease-out),
+    border-color var(--dur-ui) var(--ease-out),
+    color var(--dur-ui) var(--ease-out);
+}
+
+/* Headings are the body voice (Cinzel is reserved for inscriptions) */
+h1, h2, h3 {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--space-4);
+  text-wrap: balance;
+}
+h1 { font-size: var(--text-h1); }
+h2 { font-size: var(--text-h2); }
+h3 { font-size: var(--text-xl); }
+
+.caps { text-transform: uppercase; letter-spacing: 0.045em; }
+.greek, .text-greek { font-family: var(--font-greek); font-style: italic; }
+
+p { margin: 0 0 var(--space-4); }
+
+a { color: var(--accent-ink); text-decoration: none; }
+a:hover { color: var(--accent-bright); text-decoration: underline; text-underline-offset: 3px; }
+
+code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+.num, .text-data { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection { background: var(--accent); color: var(--bg); }
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--accent);
+  color: var(--bg);
+  padding: var(--space-2) var(--space-4);
+  z-index: 100;
+  border-radius: 0 0 var(--radius-sm) 0;
+}
+.skip-link:focus { left: 0; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.container {
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 2rem);
+  width: 100%;
+}
+
+.muted { color: var(--muted); }
+.small { font-size: var(--text-sm); }
+
+/* ---------- 3. Header / nav ---------- */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+/* the landing's meander hairline, carried through */
+.site-header::after {
+  content: "";
+  display: block;
+  height: 9px;
+  background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="13" viewBox="0 0 14 13"><path d="M0 11 H10 V2 H3 V6.5 H6.5 V11 M10 11 H14" fill="none" stroke="black" stroke-width="1.2"/></svg>') repeat-x left center / 9.7px 9px;
+          mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="13" viewBox="0 0 14 13"><path d="M0 11 H10 V2 H3 V6.5 H6.5 V11 M10 11 H14" fill="none" stroke="black" stroke-width="1.2"/></svg>') repeat-x left center / 9.7px 9px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 58px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  letter-spacing: 0.2em;
+}
+.brand:hover { color: var(--ink); text-decoration: none; }
+.brand .obol-mark { color: var(--ink); }
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.site-nav::-webkit-scrollbar { display: none; }
+
+.site-nav a {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.site-nav a:hover {
+  color: var(--ink);
+  background: var(--accent-wash);
+  text-decoration: none;
+}
+.site-nav a[aria-current="page"] {
+  color: var(--accent-ink);
+  position: relative;
+}
+.site-nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 2px;
+  height: 2px;
+  background: var(--accent);
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.3rem 0.75rem;
+  white-space: nowrap;
+}
+.live-pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--pass);
+}
+
+@media (max-width: 980px) {
+  .header-row { flex-wrap: wrap; padding-block: var(--space-2); }
+  .site-nav {
+    order: 3;
+    width: 100%;
+    margin-inline: calc(-1 * clamp(1rem, 4vw, 2rem));
+    padding-inline: clamp(1rem, 4vw, 2rem);
+    border-top: 1px solid var(--line);
+    padding-top: var(--space-2);
+  }
+  .live-pill { display: none; }
+}
+
+/* ---------- 4. Theme toggle — the two faces of the obol ---------- */
+
+.coin-toggle {
+  --coin: 34px;
+  width: var(--coin);
+  height: var(--coin);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  perspective: 220px;
+  flex-shrink: 0;
+}
+.coin-toggle .coin {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-ui) var(--ease-out);
+}
+:root[data-theme="light"] .coin-toggle .coin { transform: rotateY(180deg); }
+.coin-toggle .face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  background: var(--card);
+  backface-visibility: hidden;
+}
+.coin-toggle .face.obverse { transform: rotateY(180deg); }
+.coin-toggle:hover .face { background: var(--accent-wash); }
+.coin-toggle svg { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coin-toggle .coin { transition: none; }
+}
+
+/* ---------- 4b. Wallet — header connect control ---------- */
+
+.wallet { position: relative; flex-shrink: 0; }
+
+.wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.wallet-btn:hover { border-color: var(--accent); background: var(--accent-wash); }
+.wallet-btn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--pass); flex-shrink: 0; }
+.wallet-btn .caret { color: var(--muted); font-size: 8px; line-height: 1; }
+.wallet-btn.is-connect { font-family: var(--font-ui); font-weight: 500; font-size: var(--text-sm); padding: 0.35rem 1rem; }
+
+.wallet-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 210px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: 4px;
+  z-index: 60;
+  display: none;
+}
+.wallet-menu.open { display: block; }
+.wallet-menu .addr {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  padding: 0.45rem 0.65rem 0.35rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+  word-break: break-all;
+  white-space: normal;
+}
+.wallet-menu a,
+.wallet-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.wallet-menu a:hover,
+.wallet-menu button:hover { background: var(--accent-wash); color: var(--ink); text-decoration: none; }
+
+/* ---------- 5. Buttons, chips ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+.btn:hover { text-decoration: none; }
+
+/* primary = the landing's ink↔stone inversion, not gold */
+.btn-primary {
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-bg);
+  color: var(--btn-primary-ink);
+}
+.btn-primary:hover { opacity: 0.92; color: var(--btn-primary-ink); }
+
+.btn-ghost {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: transparent;
+}
+.btn-ghost:hover { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); }
+
+.btn-sm { padding: 0.35rem 0.8rem; font-size: var(--text-xs); }
+
+.btn[disabled],
+.btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+
+.chip-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.chip:hover { border-color: var(--accent); background: var(--accent-wash); color: var(--ink); }
+
+/* ---------- 6. Page header — inscription + ledger rule ---------- */
+
+.page-head { padding-block: var(--space-12) var(--space-8); }
+
+/* the landing's inscription: Cinzel + leading hairline */
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  margin: 0 0 var(--space-3);
+}
+.kicker::before { content: ""; width: 26px; height: 1px; background: var(--accent); }
+
+.page-head .lede {
+  font-size: var(--text-lg);
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* double hairline with an incuse punch — the obol stamp */
+.ledger-rule {
+  border: none;
+  height: 7px;
+  margin: var(--space-6) 0 0;
+  position: relative;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+}
+.ledger-rule::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%) rotate(45deg);
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+}
+
+main { padding-bottom: var(--space-section); }
+
+.section { margin-top: var(--space-12); }
+.section-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.section-title h2 { margin: 0; }
+.section-title .tag {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ---------- 7. Cards & stat tiles ---------- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+@media (max-width: 900px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .stat-grid { grid-template-columns: 1fr; } }
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-6);
+}
+.stat .label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+/* the ledger voice: numbers are mono, not serif */
+.stat .value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+.stat .value .unit {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-left: var(--space-1);
+}
+.stat .sub {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+.stat .value.at-risk { color: var(--accent-ink); }
+.stat .value.slashed { color: var(--slash); }
+
+/* ---------- 8. Verdict seals — stamped (landing treatment) ---------- */
+
+.seal {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  padding: 0.2rem 0.55rem;
+  border: 1.5px solid currentColor;
+  border-radius: var(--radius-sm);
+  transform: rotate(-3deg);
+  background: transparent;
+}
+.seal::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid currentColor;
+  border-radius: 1px;
+  opacity: 0.55;
+}
+.seal-pass { color: var(--pass); }
+.seal-open { color: var(--open); border-style: dashed; }
+.seal-open::after { border-style: dashed; }
+.seal-slashed { color: var(--slash); }
+
+/* ---------- 9. Tables ---------- */
+
+.table-wrap {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+caption {
+  text-align: left;
+  padding: var(--space-4) var(--space-6);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  border-bottom: 1px solid var(--line);
+}
+caption .tag {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-left: var(--space-2);
+}
+th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--accent-wash); }
+td:first-child, th:first-child { padding-left: var(--space-6); }
+td:last-child, th:last-child { padding-right: var(--space-6); }
+.t-right { text-align: right; }
+
+.tfoot-note {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  padding: var(--space-3) var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.tfoot-note .ok { color: var(--pass); }
+
+/* ---------- 10. Forms ---------- */
+
+.field { margin-bottom: var(--space-4); }
+.field label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+.field .hint {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+input[type="text"],
+input[type="url"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  background: var(--bg-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.8rem;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.input-mono { font-family: var(--font-mono); }
+.input-suffix { display: flex; align-items: center; gap: var(--space-2); }
+.input-suffix .suffix {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--space-4);
+}
+@media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* ---------- 11. Code blocks ---------- */
+
+pre.code {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+}
+pre.code .k { color: var(--accent-ink); }
+
+/* ---------- 12. Connect gate ---------- */
+
+.gate {
+  max-width: 560px;
+  margin-inline: auto;
+  text-align: center;
+  padding: var(--space-12) var(--space-8);
+}
+.gate .obol-mark { color: var(--accent); margin-bottom: var(--space-4); }
+.gate h2 { margin-bottom: var(--space-2); }
+.gate p { color: var(--muted); }
+.gate .btn { margin-top: var(--space-4); }
+
+.preview { position: relative; margin-top: var(--space-8); }
+.preview-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: var(--space-3);
+}
+.preview .card { opacity: 0.6; }
+.preview .card:hover { opacity: 1; }
+
+/* ---------- 13. Chat (Hire) ---------- */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.chat-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.chat-head .obol-mark { color: var(--accent); }
+.chat-log {
+  flex: 1;
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.msg {
+  max-width: 46rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.msg-broker {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  align-self: flex-start;
+}
+.msg-user {
+  background: var(--accent-wash);
+  border: 1px solid var(--line);
+  align-self: flex-end;
+}
+.msg .who {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--accent-ink);
+  margin-bottom: var(--space-1);
+}
+
+/* the single most important component: the bonded quote */
+.quote-card {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--card-2);
+  padding: var(--space-4);
+  align-self: flex-start;
+  max-width: 46rem;
+  width: 100%;
+  position: relative;
+}
+/* the landing's stele: double top rule on cards holding on-chain facts */
+.quote-card::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 0; right: 0;
+  border-top: 1px solid var(--accent);
+  opacity: 0.5;
+}
+.quote-card .quote-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--text-xs);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.quote-card .quote-grid {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: var(--space-2) var(--space-6);
+  margin: var(--space-3) 0;
+}
+@media (max-width: 640px) { .quote-card .quote-grid { grid-template-columns: repeat(2, auto); } }
+.quote-card .q-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.quote-card .q-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+.quote-card .q-value.gold,
+.quote-card .q-value.accent { color: var(--accent-ink); }
+.quote-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+.chat-input {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.chat-input input { flex: 1; }
+
+/* ---------- 14. Verdict feed (Agora) ---------- */
+
+.verdicts { list-style: none; margin: 0; padding: 0; }
+.verdicts li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm);
+  flex-wrap: wrap;
+}
+.verdicts li:last-child { border-bottom: none; }
+.verdicts .what { color: var(--ink-soft); flex: 1; min-width: 220px; }
+.verdicts .what strong { color: var(--ink); font-weight: 600; }
+.verdicts .when {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-left: auto;
+}
+.tx-link { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+.floor-empty {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  color: var(--muted);
+}
+.floor-empty .quiet {
+  font-family: var(--font-greek);
+  font-style: italic;
+  font-size: var(--text-xl);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-2);
+}
+.floor-empty pre.code {
+  display: inline-block;
+  text-align: left;
+  margin-top: var(--space-3);
+}
+
+/* ---------- 15. Decisions (details) & flow strip ---------- */
+
+.decision { border-bottom: 1px solid var(--line); }
+.decision:last-child { border-bottom: none; }
+.decision summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  list-style: none;
+}
+.decision summary::-webkit-details-marker { display: none; }
+.decision summary::after {
+  content: "+";
+  margin-left: auto;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.decision[open] summary::after { content: "−"; }
+.decision summary:hover { background: var(--accent-wash); }
+.decision .body {
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  max-width: 68ch;
+}
+.decision .meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--accent-ink);
+}
+
+.flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+@media (max-width: 900px) { .flow { grid-template-columns: repeat(2, 1fr); } }
+.flow .step {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-6);
+  position: relative;
+}
+.flow .step .route {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+.flow .step .route .arrow { color: var(--accent); }
+.flow .step .figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.375rem;
+  color: var(--ink);
+}
+
+/* ---------- 16. Calibration chart ---------- */
+
+.chart-card { padding: var(--space-6); }
+.chart-card svg { display: block; width: 100%; height: auto; }
+.chart-caption {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  max-width: 62ch;
+  margin-top: var(--space-4);
+}
+.bar { fill: var(--accent); }
+.axis-line { stroke: var(--line-strong); }
+.grid-line { stroke: var(--line); }
+/* reference diagonal: ink, dashed (gold retired with the landing) */
+.perfect-line { stroke: var(--ink); stroke-dasharray: 5 4; opacity: 0.7; }
+.axis-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--muted);
+}
+.chart-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--ink-soft);
+}
+
+/* ---------- 17. Footer ---------- */
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding-block: var(--space-12);
+  font-size: var(--text-sm);
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-8);
+}
+@media (max-width: 700px) { .footer-grid { grid-template-columns: 1fr; } }
+.footer-brand .obol-mark { color: var(--accent); }
+.footer-brand .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  margin: var(--space-2) 0 var(--space-1);
+}
+.site-footer h4 {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
+}
+.site-footer ul { list-style: none; margin: 0; padding: 0; }
+.site-footer li { margin-bottom: var(--space-1); }
+.site-footer a { color: var(--ink-soft); }
+.site-footer a:hover { color: var(--accent-bright); }
+.footer-credit {
+  margin-top: var(--space-8);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ============================================================
+   Bridge helpers — still consumed by not-yet-reskinned app components.
+   Remapped onto engye tokens; retire alongside their consumers.
+   ============================================================ */
+
+/* eyebrow (old kicker on a couple panels) */
 .eyebrow {
   display: inline-flex; align-items: center; gap: 12px;
   font-family: var(--font-display); font-weight: 700; font-size: 12px;
-  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--gold);
+  text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--accent-ink);
 }
-.dark .eyebrow { color: var(--gold-lifted); }
 .eyebrow::before { content: ""; width: 24px; height: 1px; background: currentColor; }
 
-/* ===== layout: stele, fluting, meander ===== */
+/* stele double top rule (cards holding on-chain facts) */
 .stele { border-top: 1px solid currentColor; position: relative; }
 .stele::before { content: ""; position: absolute; top: 3px; left: 0; right: 0; border-top: 1px solid currentColor; }
-.fluting { background-image: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 24px); opacity: 0.05; }
-.meander-hairline { height: 8px; opacity: 0.2; background-image: url("/assets/meander-tile.svg"); background-repeat: repeat-x; background-size: auto 8px; }
-.dark .meander-hairline, .meander-hairline.light { background-image: url("/assets/meander-tile-light.svg"); }
+.meander-hairline { height: 9px; background-color: color-mix(in srgb, var(--ink) 22%, transparent);
+  -webkit-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="13" viewBox="0 0 14 13"><path d="M0 11 H10 V2 H3 V6.5 H6.5 V11 M10 11 H14" fill="none" stroke="black" stroke-width="1.2"/></svg>') repeat-x left center / 9.7px 9px;
+          mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="13" viewBox="0 0 14 13"><path d="M0 11 H10 V2 H3 V6.5 H6.5 V11 M10 11 H14" fill="none" stroke="black" stroke-width="1.2"/></svg>') repeat-x left center / 9.7px 9px; }
 
-/* the only pulse in the product — the live pill's laurel dot */
+/* live pill laurel-dot pulse (the one pulse in the product) */
 @keyframes engye-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-/* single slide-fade per new feed row */
 @keyframes engye-row-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .engye-row-in { animation: engye-row-in var(--dur) var(--ease); }
 
-/* ===== tokens/animations.css — tw-animate-css subset (content-entering reveals only) ===== */
+/* tw-animate-css subset (dropdowns / modals: content-entering reveals only) */
 @keyframes engye-enter {
   from {
     opacity: var(--tw-enter-opacity, 1);
     transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0) scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
   }
 }
-@keyframes engye-exit {
-  to {
-    opacity: var(--tw-exit-opacity, 1);
-    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0) scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
-  }
-}
-.animate-in { animation: engye-enter var(--dur, 200ms) var(--ease) both; }
-.animate-out { animation: engye-exit var(--dur, 200ms) var(--ease) both; }
+.animate-in { animation: engye-enter var(--dur, 220ms) var(--ease) both; }
 .fade-in, .fade-in-0 { --tw-enter-opacity: 0; }
-.fade-out, .fade-out-0 { --tw-exit-opacity: 0; }
 .zoom-in-95 { --tw-enter-scale: 0.95; }
 .zoom-in-90 { --tw-enter-scale: 0.90; }
 .slide-in-from-top-2 { --tw-enter-translate-y: -0.5rem; }
-.slide-in-from-top-4 { --tw-enter-translate-y: -1rem; }
 .slide-in-from-bottom-2 { --tw-enter-translate-y: 0.5rem; }
-.slide-in-from-bottom-4 { --tw-enter-translate-y: 1rem; }
-.slide-in-from-left-4 { --tw-enter-translate-x: -1rem; }
-.slide-in-from-right-4 { --tw-enter-translate-x: 1rem; }
 .duration-150 { animation-duration: 150ms; }
 .duration-200 { animation-duration: 200ms; }
 .duration-300 { animation-duration: 300ms; }
-.delay-75 { animation-delay: 75ms; }
-.delay-150 { animation-delay: 150ms; }
-.delay-300 { animation-delay: 300ms; }
 
-/* verdict-feed arrival flash — one-shot status wash on the newest row */
-@keyframes engye-flash-pass { from { background-color: color-mix(in oklab, var(--laurel) 22%, transparent); } to { background-color: transparent; } }
-@keyframes engye-flash-slash { from { background-color: color-mix(in oklab, var(--oxblood) 22%, transparent); } to { background-color: transparent; } }
+/* verdict-feed arrival flash */
+@keyframes engye-flash-pass { from { background-color: var(--pass-wash); } to { background-color: transparent; } }
+@keyframes engye-flash-slash { from { background-color: var(--slash-wash); } to { background-color: transparent; } }
 .flash-pass { animation: engye-flash-pass 1.4s var(--ease) both; }
 .flash-slash { animation: engye-flash-slash 1.4s var(--ease) both; }
 
-/* typing indicator dots — the broker composing (the one functional loop) */
+/* typing indicator (broker composing) */
 @keyframes engye-typing { 0%, 60%, 100% { opacity: 0.25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-2px); } }
 .typing-dot { animation: engye-typing 1.2s var(--ease) infinite; }
 
-/* progress / countdown fills — animate transform:scaleX (compositor-friendly), never width.
-   Component sets `transform: scaleX(<0..1>)` + its own `transition: transform …` inline; this
-   class carries the origin and kills the transition under reduced-motion. */
+/* compositor-friendly countdown/progress fills (component sets scaleX inline) */
 .bar-fill { transform-origin: left center; }
 
-/* interactive surface — subtle hover lift + gold-edge glow (cards, panels). Transform-only. */
-.card-lift { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-.card-lift:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in oklab, var(--ring) 45%, var(--border));
-  box-shadow: 0 6px 20px -12px color-mix(in oklab, var(--foreground) 55%, transparent);
-}
-
-/* table row hover wash — feed + leaderboard */
+/* table row hover wash */
 .row-hover { transition: background-color var(--dur-fast) var(--ease); }
-.row-hover:hover { background-color: color-mix(in oklab, var(--foreground) 4%, transparent); }
+.row-hover:hover { background-color: var(--accent-wash); }
 
-/* assistant-ui hire chat: composer card ring on focus-within; pill hover; disabled send */
+/* hire composer focus ring */
 .aui-composer { transition: box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-.aui-composer:focus-within { border-color: color-mix(in oklab, var(--ring) 55%, var(--input)); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 25%, transparent); }
+.aui-composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
 .aui-pill { transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
-.aui-pill:hover { background-color: var(--secondary); }
+.aui-pill:hover { background-color: var(--bg-raised); }
 .aui-send:disabled { opacity: 0.45; cursor: not-allowed; }
 
-@media (prefers-reduced-motion: reduce) {
-  .engye-row-in, [style*="engye-live-pulse"],
-  .animate-in, .animate-out, .flash-pass, .flash-slash, .typing-dot { animation: none !important; }
-  .bar-fill, .card-lift, .row-hover { transition: none !important; }
-  .card-lift:hover { transform: none; }
-}
-
-a { color: inherit; }
-
-/* Keyboard focus ring — gold, only on :focus-visible (never on mouse click). Elements keep
-   `outline: none` inline; this adds the ring for keyboard/AT users. */
+/* keyboard focus ring */
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 
-/* Skip-to-content link — off-screen until focused, then pinned top-left. */
-.skip-link {
-  position: absolute; left: -9999px; top: 0; z-index: 100;
-  padding: 10px 16px; background: var(--card); color: var(--foreground);
-  border: 1px solid var(--border); border-radius: var(--radius);
-  font-family: var(--font-body); font-size: 14px; text-decoration: none;
-}
-.skip-link:focus { left: 8px; top: 8px; }
-
-/* ===== responsive layout layer (ultrawide → iPhone SE) =====
-   Inline styles can't hold media queries, so shared layout lives here as classes.
-   Symmetric grids collapse intrinsically via auto-fit + min(); asymmetric ones use a breakpoint. */
-
-/* never let a page scroll sideways; media never overflows its box */
-html, body { max-width: 100%; overflow-x: hidden; }
-img, svg, video, canvas { max-width: 100%; }
-
-/* centered content column: fluid gutters, capped, but breathes wider on ultrawide */
-.container { width: 100%; max-width: 1280px; margin-inline: auto; box-sizing: border-box; padding-inline: clamp(16px, 4vw, 48px); }
-@media (min-width: 1920px) { .container { max-width: 1600px; } }
-
-/* fluid section rhythm — replaces fixed "112px 48px" (crushes to 56px on phones) */
+/* ===== responsive layout helpers (ultrawide → iPhone SE) ===== */
 .section-pad { padding-block: clamp(56px, 9vw, 112px); padding-inline: clamp(20px, 5vw, 48px); box-sizing: border-box; }
 .page-gutter { padding-inline: clamp(16px, 4vw, 24px); }
 
-/* asymmetric hero: two columns on desktop → single column (art below/hidden) under 860px */
 .r-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(24px, 4vw, 48px); align-items: center; }
 @media (max-width: 860px) { .r-hero { grid-template-columns: 1fr; } .r-hero-art { justify-content: flex-start !important; } }
 @media (max-width: 520px) { .r-hero-art { display: none !important; } }
 
-/* asymmetric split (providers/two-col) → stack under 860px */
 .r-split { display: grid; grid-template-columns: 1fr 1.2fr; gap: clamp(32px, 5vw, 64px); align-items: center; }
 @media (max-width: 860px) { .r-split { grid-template-columns: 1fr; } }
 
-/* symmetric auto-collapsing grids — no breakpoint needed; min() forces 1 col when narrower than the min */
 .r-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: clamp(20px, 3vw, 32px); }
 .r-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 16px; }
 .r-2col { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; }
 
-/* footer → stack under 640px */
 .r-footer { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 32px; }
 @media (max-width: 640px) { .r-footer { grid-template-columns: 1fr; gap: 24px; } }
 
-/* app header nav: horizontal row on desktop, hamburger + dropdown panel under 860px */
 .nav-desktop { display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .nav-desktop::-webkit-scrollbar { display: none; }
 .nav-desktop > * { flex-shrink: 0; white-space: nowrap; }
@@ -260,14 +1249,22 @@ img, svg, video, canvas { max-width: 100%; }
   position: absolute; top: calc(100% + 4px); right: clamp(16px, 4vw, 48px);
   z-index: 50; min-width: 220px; max-width: calc(100vw - 32px);
   display: flex; flex-direction: column; gap: 2px; padding: 8px;
-  background: var(--popover); color: var(--popover-foreground);
-  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-popover);
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow);
 }
 .nav-backdrop { position: fixed; inset: 0; z-index: 40; }
 
-/* visibility helpers by width */
 @media (max-width: 520px) { .r-hide-xs { display: none !important; } }
 @media (max-width: 768px) { .r-hide-sm { display: none !important; } }
-
-/* prevent flex children from refusing to shrink (text truncation, no overflow) */
 .min-w-0 { min-width: 0; }
+
+/* ---------- 18. Motion prefs ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

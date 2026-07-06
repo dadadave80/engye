@@ -1,13 +1,19 @@
 import { type ReactNode } from "react";
-import { AppHeader } from "./AppHeader";
+import { SiteHeader } from "./SiteHeader";
+import { SiteFooter } from "./SiteFooter";
 
-export function AppShell({ settled, children }: { settled?: number; children: ReactNode }) {
+// App chrome: skip-link → sticky header (with the meander hairline) → container'd main → footer.
+// Theme-driven via [data-theme] on <html> (set pre-paint in the root layout); no forced .dark.
+// `settled` is accepted for call-site compatibility but the handoff header carries no live pill.
+export function AppShell({ children }: { settled?: number; children: ReactNode }) {
   return (
-    <div className="dark" style={{ minHeight: "100vh", background: "var(--background)", color: "var(--foreground)", fontFamily: "var(--font-body)", colorScheme: "dark" }}>
+    <>
       <a href="#main-content" className="skip-link">Skip to content</a>
-      <AppHeader settled={settled} />
-      <div className="meander-hairline" />
-      <main id="main-content" tabIndex={-1} className="container" style={{ paddingBlock: 24, outline: "none" }}>{children}</main>
-    </div>
+      <SiteHeader />
+      <main id="main-content" tabIndex={-1}>
+        <div className="container">{children}</div>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
