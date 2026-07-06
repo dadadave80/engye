@@ -2,21 +2,12 @@
 // Public match receipt — spec, deliverable, broker reasoning, verdict, full on-chain tx timeline.
 // Countdown while the verdict is pending; realtime flip when settle() lands; a permissionless
 // "settle now" poke once the verdict window is >60s overdue (anyone may call /api/settle).
+// Skinned to the handoff: kicker + stamped seals + .quote-card + .code + a chiselled tx timeline.
 import { useEffect, useState, type CSSProperties } from "react";
-import { Check, Clock, ExternalLink } from "lucide-react";
-import { Card, Badge, Eyebrow, Button } from "@/components/ui/primitives";
 import { supabasePublic, txUrl } from "@/lib/supabase/public";
 import { VERDICT_WINDOW_SECONDS } from "@/lib/economics";
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
-const row: CSSProperties = { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, ...mono, fontSize: 14, padding: "8px 0", borderBottom: "1px solid var(--border)" };
-const lastRow: CSSProperties = { ...row, borderBottom: "none" };
-const pre: CSSProperties = {
-  ...mono, fontSize: 13, background: "var(--secondary)", border: "1px solid var(--border)",
-  borderRadius: "var(--radius)", padding: 12, maxHeight: 280, overflow: "auto",
-  whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0,
-};
-const label: CSSProperties = { display: "block", marginBottom: 10 };
 
 type Task = { type?: string; spec?: string; max_price_usdc?: number; quality_bar?: string } | null;
 type Quote = {
@@ -51,38 +42,30 @@ export type MatchRow = {
 const SELECT = "*, quotes(task,confidence,bond_usdc,total_price_usdc,reasoning), providers(name), validations(pass,score,reasons,model)";
 
 const TERMINAL = new Set(["delivered", "failed_compensated"]);
-
-function badgeStatus(status: string): "PASS" | "SLASHED" | "OPEN" {
-  if (status === "delivered") return "PASS";
-  if (status === "failed_compensated") return "SLASHED";
-  return "OPEN"; // pending|bonded|paid|awaiting_verdict|validating|settle_retry|error
-}
+const sealFor = (status: string) => status === "delivered" ? "seal-pass" : status === "failed_compensated" ? "seal-slashed" : "seal-open";
+const sealText = (status: string) => status === "delivered" ? "PASS" : status === "failed_compensated" ? "SLASHED" : "OPEN";
 
 function fmtClock(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, "0")}`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
+const fx = (n: number | null): string => (n != null ? Number(n).toFixed(3) : "—");
+const fmtUsdc = (n: number | null): string | undefined => (n != null ? `${fx(n)} USDC` : undefined);
 
-const fmtUsdc = (n: number | null): string | undefined => (n != null ? `${n.toFixed(4)} USDC` : undefined);
-
-// The on-chain stepper (design: TxTimeline) — one step per real tx column already on the row.
-// `tone` colors the filled node + amount for money-moving steps whose direction depends on the
-// verdict (Settle releases OR slashes the bond; Refund only ever fires on the fail path).
+// The on-chain stepper — one step per real tx column on the row. `tone` colours money-moving steps
+// whose direction depends on the verdict (Settle releases OR slashes; Refund only fires on fail).
 type TxStep = { label: string; tx: string | null; amount?: string; tone?: string };
-
 function txSteps(m: MatchRow, passed: boolean | null): TxStep[] {
-  const bondAmount = fmtUsdc(m.bond_usdc != null ? Number(m.bond_usdc) : null);
-  const priceAmount = fmtUsdc(m.price_usdc != null ? Number(m.price_usdc) : null);
-  const settleTone = passed == null ? undefined : passed ? "var(--laurel)" : "var(--oxblood)";
+  const bondAmount = fmtUsdc(m.bond_usdc);
+  const priceAmount = fmtUsdc(m.price_usdc);
+  const settleTone = passed == null ? undefined : passed ? "var(--pass)" : "var(--slash)";
   return [
     { label: "Bond", tx: m.bond_tx, amount: bondAmount },
     { label: "Validation request", tx: m.validation_request_tx },
     { label: "Provider paid", tx: m.pay_tx, amount: priceAmount },
     { label: "Validation response", tx: m.validation_response_tx },
     { label: "Settle", tx: m.settle_tx, amount: bondAmount, tone: settleTone },
-    { label: "Refund", tx: m.refund_tx, amount: priceAmount, tone: "var(--oxblood)" },
+    { label: "Refund", tx: m.refund_tx, amount: priceAmount, tone: "var(--slash)" },
     { label: "Stake slash", tx: m.stake_slash_tx },
     { label: "Feedback", tx: m.feedback_tx },
   ];
@@ -95,14 +78,12 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
 
   const terminal = TERMINAL.has(m.status);
 
-  // countdown tick — only while a verdict is still outstanding
   useEffect(() => {
     if (terminal) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [terminal]);
 
-  // realtime: this match's row changed (verdict landed, tx recorded, status flipped) — refetch with joins
   useEffect(() => {
     const sb = supabasePublic();
     const ch = sb
@@ -125,127 +106,106 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
   const msLeft = dueAtMs != null ? dueAtMs - now : null;
   const overdue = msLeft != null && msLeft < -60_000;
   const progress = msLeft != null ? Math.min(1, Math.max(0, msLeft / (VERDICT_WINDOW_SECONDS * 1000))) : 0;
-  // ground truth for "which way did the money move" — tied to m.status (mirrors the Badge), not the
-  // raw validation.pass bool, so an unbonded best-effort delivery (always "delivered") never renders
-  // the slashed copy just because its validator happened to fail it.
+  // ground truth for "which way the money moved" — tied to m.status (mirrors the seal), so an
+  // unbonded best-effort delivery ("delivered") never renders the slashed copy.
   const passed = terminal ? m.status !== "failed_compensated" : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 760, margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-        <div className="min-w-0" style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          <Eyebrow>Match receipt</Eyebrow>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, margin: 0, overflowWrap: "anywhere" }}>{task?.type ?? "task"}</h1>
+      <div className="page-head" style={{ paddingBottom: 0 }}>
+        <p className="kicker">Match Receipt</p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <h1 style={{ margin: 0, overflowWrap: "anywhere" }}>{task?.type ?? "task"}</h1>
+          <span className={`seal ${sealFor(m.status)}`}>{sealText(m.status)}</span>
         </div>
-        <Badge status={badgeStatus(m.status)} />
+        <hr className="ledger-rule" />
       </div>
 
-      <Card stele padding={20}>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Provider</span><span style={{ overflowWrap: "anywhere", textAlign: "right" }}>{m.providers?.name ?? "—"}</span></div>
-          <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Confidence ĉ</span><span>{m.quotes?.confidence != null ? m.quotes.confidence.toFixed(2) : "—"}</span></div>
-          <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Bond</span><span>{m.bond_usdc != null ? Number(m.bond_usdc).toFixed(4) : "—"} USDC</span></div>
-          <div style={lastRow}><span style={{ color: "var(--muted-foreground)" }}>Price</span><span>{m.price_usdc != null ? Number(m.price_usdc).toFixed(4) : "—"} USDC</span></div>
+      <div className="quote-card">
+        <div className="quote-grid">
+          <div><div className="q-label">provider</div><div className="q-value">{m.providers?.name ?? "—"}</div></div>
+          <div><div className="q-label">confidence ĉ</div><div className="q-value">{m.quotes?.confidence != null ? m.quotes.confidence.toFixed(2) : "—"}</div></div>
+          <div><div className="q-label">bond</div><div className="q-value accent">{fx(m.bond_usdc)} USDC</div></div>
+          <div><div className="q-label">price</div><div className="q-value">{fx(m.price_usdc)} USDC</div></div>
         </div>
-      </Card>
+      </div>
 
       {task?.spec && (
-        <Card padding={20}>
-          <Eyebrow style={label}>Task spec</Eyebrow>
-          <pre style={pre}>{task.spec}</pre>
-        </Card>
+        <div className="card">
+          <div className="q-label" style={{ marginBottom: 10 }}>Task spec</div>
+          <pre className="code" style={{ maxHeight: 280, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{task.spec}</pre>
+        </div>
       )}
 
       {m.deliverable != null && (
-        <Card padding={20}>
-          <Eyebrow style={label}>Deliverable</Eyebrow>
-          <pre style={pre}>{JSON.stringify(m.deliverable, null, 2)}</pre>
-        </Card>
+        <div className="card">
+          <div className="q-label" style={{ marginBottom: 10 }}>Deliverable</div>
+          <pre className="code" style={{ maxHeight: 280, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(m.deliverable, null, 2)}</pre>
+        </div>
       )}
 
       {m.quotes?.reasoning && (
-        <Card padding={20}>
-          <Eyebrow style={label}>Broker&apos;s reasoning</Eyebrow>
-          <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{m.quotes.reasoning}</p>
-        </Card>
+        <div className="card">
+          <div className="q-label" style={{ marginBottom: 10 }}>Broker&apos;s reasoning</div>
+          <p style={{ fontSize: "var(--text-sm)", lineHeight: 1.6, margin: 0 }}>{m.quotes.reasoning}</p>
+        </div>
       )}
 
-      <Card
-        stele padding={20}
-        style={terminal && passed != null
-          ? { borderColor: `color-mix(in oklab, ${passed ? "var(--laurel)" : "var(--oxblood)"} 40%, var(--border))` }
-          : undefined}
-      >
-        <Eyebrow style={label}>Verdict</Eyebrow>
+      <div className="card" style={terminal && passed != null ? { borderColor: passed ? "var(--pass)" : "var(--slash)" } : undefined}>
+        <div className="q-label" style={{ marginBottom: 10 }}>Verdict</div>
         <div aria-live="polite">
-        {!terminal ? (
-          <div className="animate-in fade-in duration-300" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Clock size={16} color="var(--ring)" aria-hidden="true" />
-              {msLeft != null ? (
-                msLeft > 0 ? (
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>verdict in <span style={mono}>{fmtClock(msLeft)}</span></span>
-                ) : (
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>verdict overdue by <span style={{ ...mono, color: "var(--gold-lifted)" }}>{fmtClock(-msLeft)}</span></span>
-                )
-              ) : (
-                <span style={{ fontSize: 14, color: "var(--muted-foreground)" }}>Awaiting delivery…</span>
-              )}
-              <span style={{ marginLeft: "auto", fontSize: 12.5, color: "var(--muted-foreground)" }}>the validator rules publicly</span>
-            </div>
-            {msLeft != null && (
-              <div style={{ height: 4, borderRadius: 2, background: "var(--secondary)", overflow: "hidden" }}>
-                <div
-                  className="bar-fill"
-                  style={{
-                    height: "100%", width: "100%", background: "var(--ring)",
-                    transformOrigin: "left center", transform: `scaleX(${progress})`, transition: "transform 1s linear",
-                  }}
-                />
+          {!terminal ? (
+            <div className="animate-in fade-in duration-300" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
+                {msLeft != null ? (
+                  msLeft > 0
+                    ? <span style={{ fontWeight: 500 }}>verdict in <span style={mono}>{fmtClock(msLeft)}</span></span>
+                    : <span style={{ fontWeight: 500 }}>verdict overdue by <span style={{ ...mono, color: "var(--accent-ink)" }}>{fmtClock(-msLeft)}</span></span>
+                ) : <span className="muted">Awaiting delivery…</span>}
+                <span className="small muted" style={{ marginLeft: "auto" }}>the validator rules publicly</span>
               </div>
-            )}
-            {overdue && (
-              <Button
-                size="sm" variant="outline" disabled={poking}
-                onClick={async () => { setPoking(true); await fetch("/api/settle", { method: "POST" }); setPoking(false); }}
-              >
-                {poking ? "Settling…" : "Settle Now (Anyone May)"}
-              </Button>
-            )}
-          </div>
-        ) : validation ? (
-          <div className="animate-in fade-in zoom-in-95 duration-300" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <Badge status={badgeStatus(m.status)} />
-              <span style={{ fontSize: 12.5, color: "var(--muted-foreground)", marginLeft: "auto" }}>
-                ruled by <span style={mono}>{validation.model ?? "—"}</span>
-                {validation.score != null && <> · score <span style={mono}>{validation.score}</span></>}
-              </span>
+              {msLeft != null && (
+                <div style={{ height: 4, borderRadius: 2, background: "var(--bg-raised)", overflow: "hidden" }}>
+                  <div className="bar-fill" style={{ height: "100%", width: "100%", background: "var(--accent)", transformOrigin: "left center", transform: `scaleX(${progress})`, transition: "transform 1s linear" }} />
+                </div>
+              )}
+              {overdue && (
+                <button className="btn btn-ghost btn-sm" disabled={poking} aria-disabled={poking}
+                  onClick={async () => { setPoking(true); await fetch("/api/settle", { method: "POST" }); setPoking(false); }}>
+                  {poking ? "Settling…" : "Settle now (anyone may)"}
+                </button>
+              )}
             </div>
-            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
-              {passed
-                ? "Bond released — the broker kept its stake. The work passed the spec."
-                : <>Slashed — you were paid{" "}
-                  <span style={{ ...mono, color: "var(--destructive)" }}>
-                    {m.price_usdc != null && m.bond_usdc != null ? (Number(m.price_usdc) + Number(m.bond_usdc)).toFixed(4) : "—"} USDC
-                  </span>{" "}
-                  (price + bond), plus a cut of the provider&apos;s stake.
-                </>}
-            </p>
-            {validation.reasons != null && (
-              <pre style={pre}>
-                {typeof validation.reasons === "string" ? validation.reasons : JSON.stringify(validation.reasons, null, 2)}
-              </pre>
-            )}
-          </div>
-        ) : (
-          <div style={{ fontSize: 14, color: "var(--muted-foreground)" }}>No validation recorded.</div>
-        )}
+          ) : validation ? (
+            <div className="animate-in fade-in zoom-in-95 duration-300" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <span className={`seal ${sealFor(m.status)}`}>{sealText(m.status)}</span>
+                <span className="small muted" style={{ marginLeft: "auto" }}>
+                  ruled by <span style={mono}>{validation.model ?? "—"}</span>
+                  {validation.score != null && <> · score <span style={mono}>{validation.score}</span></>}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", lineHeight: 1.5 }}>
+                {passed
+                  ? "Bond released — the broker kept its stake. The work passed the spec."
+                  : <>Slashed — you were paid{" "}
+                    <span style={{ ...mono, color: "var(--slash)" }}>
+                      {m.price_usdc != null && m.bond_usdc != null ? (Number(m.price_usdc) + Number(m.bond_usdc)).toFixed(3) : "—"} USDC
+                    </span>{" "}(price + bond), plus a cut of the provider&apos;s stake.
+                  </>}
+              </p>
+              {validation.reasons != null && (
+                <pre className="code" style={{ maxHeight: 280, overflow: "auto", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                  {typeof validation.reasons === "string" ? validation.reasons : JSON.stringify(validation.reasons, null, 2)}
+                </pre>
+              )}
+            </div>
+          ) : <div className="small muted">No validation recorded.</div>}
         </div>
-      </Card>
+      </div>
 
-      <Card padding={20}>
-        <Eyebrow style={label}>On-chain timeline</Eyebrow>
+      <div className="card">
+        <div className="q-label" style={{ marginBottom: 10 }}>On-chain timeline</div>
         <div>
           {txSteps(m, passed).map((s, i, arr) => {
             const last = i === arr.length - 1;
@@ -254,34 +214,25 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
             return (
               <div key={s.label} style={{ display: "flex", gap: 12 }}>
                 <div style={{ position: "relative", width: 16, flexShrink: 0 }}>
-                  <span style={{
-                    position: "relative", zIndex: 1, display: "grid", placeItems: "center",
-                    width: 16, height: 16, borderRadius: 999,
-                    background: done ? (s.tone ?? "var(--foreground)") : "transparent",
-                    border: done ? "none" : "2px solid var(--border)",
-                  }}>
-                    {done && <Check size={10} color="var(--background)" strokeWidth={3} aria-hidden="true" />}
+                  <span style={{ position: "relative", zIndex: 1, display: "grid", placeItems: "center", width: 16, height: 16, borderRadius: 999, background: done ? (s.tone ?? "var(--ink)") : "transparent", border: done ? "none" : "2px solid var(--line-strong)", color: "var(--bg)", fontSize: 10, fontFamily: "var(--font-mono)" }}>
+                    {done ? "✓" : ""}
                   </span>
-                  {!last && <span style={{ position: "absolute", left: 7, top: 18, bottom: -6, width: 2, background: "var(--border)" }} />}
+                  {!last && <span style={{ position: "absolute", left: 7, top: 18, bottom: -6, width: 2, background: "var(--line)" }} />}
                 </div>
                 <div style={{ paddingBottom: last ? 0 : 18, flex: 1, marginTop: -1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                    <span className="min-w-0" style={{ fontSize: 14, fontWeight: 500, color: done ? "var(--foreground)" : "var(--muted-foreground)" }}>{s.label}</span>
-                    {url && (
-                      <a href={url} target="_blank" rel="noreferrer" title="View on Arcscan" aria-label={`View ${s.label} on Arcscan`} style={{ color: "var(--link)", display: "inline-flex", flexShrink: 0 }}>
-                        <ExternalLink size={13} aria-hidden="true" />
-                      </a>
-                    )}
-                    {s.amount && <span style={{ ...mono, fontSize: 12.5, color: s.tone ?? "var(--muted-foreground)", marginLeft: "auto", flexShrink: 0 }}>{s.amount}</span>}
+                    <span className="min-w-0" style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: done ? "var(--ink)" : "var(--muted)" }}>{s.label}</span>
+                    {url && <a className="tx-link" href={url} target="_blank" rel="noreferrer" title={`View ${s.label} on Arcscan`} style={{ flexShrink: 0 }}>↗</a>}
+                    {s.amount && <span style={{ ...mono, fontSize: "var(--text-xs)", color: s.tone ?? "var(--muted)", marginLeft: "auto", flexShrink: 0 }}>{s.amount}</span>}
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
-      </Card>
+      </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, fontSize: 12, color: "var(--muted-foreground)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }} className="small muted">
         <span className="min-w-0" style={{ ...mono, wordBreak: "break-all", overflowWrap: "anywhere", minWidth: 0 }} title={m.match_key}>{m.match_key}</span>
         <span>bonded by ENGYE</span>
       </div>
