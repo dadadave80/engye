@@ -1,9 +1,9 @@
 // Step-idempotent, resumable settlement (spec §3.2-3.3). Any step may already have run in a
 // prior attempt that died — every step re-derives "already done?" from on-chain/DB state.
 // Order: verdict(once) → money(on-chain-guarded) → terminal status → reputation tail(best-effort).
-import { createPublicClient, http, parseAbi, type Address, type Hex } from "viem";
-import { arcTestnet } from "viem/chains";
+import { parseAbi, type Address, type Hex } from "viem";
 import { supabaseAdmin } from "./db";
+import { arcPublic } from "./chain";
 import { validateDeliverable } from "./validator";
 import { getBond, releaseBond, slashBond, slashProviderStake, refundFromTreasury } from "./escrow";
 import { respondValidation, giveFeedback, contentHash } from "./erc8004";
@@ -13,13 +13,9 @@ const LEASE_MS = 120_000; // a 'validating' row older than this is a dead attemp
 
 const vaultViewAbi = parseAbi(["function refunded(bytes32 matchId) view returns (uint256)"]);
 const stakeViewAbi = parseAbi(["function slashed_for(bytes32 matchId) view returns (uint256)"]);
-const pub = createPublicClient({
-  chain: arcTestnet,
-  transport: http(process.env.RPC ?? undefined, { timeout: 15_000, retryCount: 3, retryDelay: 200 }),
-});
 
 async function alreadyRefunded(matchKey: Hex): Promise<boolean> {
-  const v = await pub.readContract({
+  const v = await arcPublic().readContract({
     address: process.env.REFUND_VAULT_ADDRESS as Address,
     abi: vaultViewAbi, functionName: "refunded", args: [matchKey],
   });
@@ -27,7 +23,7 @@ async function alreadyRefunded(matchKey: Hex): Promise<boolean> {
 }
 
 async function alreadySlashed(matchKey: Hex): Promise<boolean> {
-  const v = await pub.readContract({
+  const v = await arcPublic().readContract({
     address: process.env.PROVIDER_STAKE_ADDRESS as Address,
     abi: stakeViewAbi, functionName: "slashed_for", args: [matchKey],
   });

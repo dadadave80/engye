@@ -1,16 +1,8 @@
 // Rail B — BondedEscrow bindings (plain USDC ERC-20 transfers on Arc; gas is USDC).
-import {
-  createPublicClient,
-  createWalletClient,
-  http,
-  parseAbi,
-  keccak256,
-  toBytes,
-  type Address,
-  type Hex,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { arcTestnet } from "viem/chains";
+// All chain plumbing lives in lib/chain.ts (arcPublic/arcClients/sendTx) — this module only knows
+// addresses, ABIs, and amounts. Reads use arcPublic() and need no key.
+import { parseAbi, keccak256, toBytes, type Address, type Hex } from "viem";
+import { arcPublic, arcClients, sendTx } from "./chain";
 
 const escrowAbi = parseAbi([
   "function create_bond(bytes32 matchId, uint256 amount, address requester, bytes32 decisionHash, uint256 deadline)",
@@ -38,38 +30,20 @@ function escrowAddress(): Address {
   return a as Address;
 }
 
-function clients() {
+function brokerPk(): string {
   const pk = process.env.BROKER_PRIVATE_KEY;
   if (!pk) throw new Error("BROKER_PRIVATE_KEY missing");
-  const account = privateKeyToAccount(pk as Hex);
-  const transport = http(process.env.RPC ?? undefined);
-  return {
-    account,
-    pub: createPublicClient({ chain: arcTestnet, transport }),
-    wallet: createWalletClient({ chain: arcTestnet, transport, account }),
-  };
+  return pk;
 }
 
-async function write(
+const write = (
   fn: "create_bond" | "release" | "slash" | "claim_timeout",
   args: readonly unknown[],
-): Promise<Hex> {
-  const { pub, wallet, account } = clients();
-  const hash = await wallet.writeContract({
-    address: escrowAddress(),
-    abi: escrowAbi,
-    functionName: fn,
-    args: args as never,
-    account,
-  });
-  const receipt = await pub.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error(`${fn} reverted: ${hash}`);
-  return hash;
-}
+): Promise<Hex> => sendTx({ pk: brokerPk(), address: escrowAddress(), abi: escrowAbi, functionName: fn, args, label: fn });
 
 /** One-time (idempotent) max-approve of the escrow to pull broker USDC. */
 export async function ensureAllowance(): Promise<void> {
-  const { pub, wallet, account } = clients();
+  const { pub, account } = arcClients(brokerPk());
   const allowance = await pub.readContract({
     address: USDC,
     abi: erc20Abi,
@@ -77,14 +51,10 @@ export async function ensureAllowance(): Promise<void> {
     args: [account.address, escrowAddress()],
   });
   if (allowance > 2n ** 128n) return;
-  const hash = await wallet.writeContract({
-    address: USDC,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [escrowAddress(), 2n ** 256n - 1n],
-    account,
+  await sendTx({
+    pk: brokerPk(), address: USDC, abi: erc20Abi, functionName: "approve",
+    args: [escrowAddress(), 2n ** 256n - 1n], label: "escrow approve",
   });
-  await pub.waitForTransactionReceipt({ hash });
 }
 
 /** keccak256 of the broker's full decision JSON — committed on-chain with the bond. */
@@ -136,46 +106,27 @@ function stakeAddress(): Address {
 }
 
 /** Price refund to the requester via RefundVault — once-per-match enforced on-chain. */
-export async function refundFromTreasury(matchId: Hex, to: Address, amountUsdc: number): Promise<Hex> {
-  const { pub, wallet, account } = clients();
-  const hash = await wallet.writeContract({
-    address: vaultAddress(),
-    abi: vaultAbi,
-    functionName: "refund",
-    args: [matchId, to, usdcAtomic(amountUsdc)],
-    account,
+export const refundFromTreasury = (matchId: Hex, to: Address, amountUsdc: number): Promise<Hex> =>
+  sendTx({
+    pk: brokerPk(), address: vaultAddress(), abi: vaultAbi, functionName: "refund",
+    args: [matchId, to, usdcAtomic(amountUsdc)], label: "refund",
   });
-  const receipt = await pub.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error(`refund reverted: ${hash}`);
-  return hash;
-}
 
-/** Move broker USDC into the refund float (needs ensureAllowance for the vault). */
+/** Move broker USDC into the refund float. */
 export async function fundVault(amountUsdc: number): Promise<Hex> {
-  const { pub, wallet, account } = clients();
-  const approve = await wallet.writeContract({
-    address: USDC,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [vaultAddress(), usdcAtomic(amountUsdc)],
-    account,
+  await sendTx({
+    pk: brokerPk(), address: USDC, abi: erc20Abi, functionName: "approve",
+    args: [vaultAddress(), usdcAtomic(amountUsdc)], label: "vault approve",
   });
-  await pub.waitForTransactionReceipt({ hash: approve });
-  const hash = await wallet.writeContract({
-    address: vaultAddress(),
-    abi: vaultAbi,
-    functionName: "fund",
-    args: [usdcAtomic(amountUsdc)],
-    account,
+  return sendTx({
+    pk: brokerPk(), address: vaultAddress(), abi: vaultAbi, functionName: "fund",
+    args: [usdcAtomic(amountUsdc)], label: "vault fund",
   });
-  await pub.waitForTransactionReceipt({ hash });
-  return hash;
 }
 
 /** Provider co-insurance stake (0 if unstaked) — the broker LLM reads this as a trust signal. */
 export async function getProviderStake(provider: Address): Promise<bigint> {
-  const { pub } = clients();
-  return pub.readContract({
+  return arcPublic().readContract({
     address: stakeAddress(),
     abi: stakeAbi,
     functionName: "stakes",
@@ -184,34 +135,27 @@ export async function getProviderStake(provider: Address): Promise<bigint> {
 }
 
 /** On fail: slash provider stake (capped at stake, once per match) to the requester, on top of the bond. */
-export async function slashProviderStake(
+export const slashProviderStake = (
   matchId: Hex,
   provider: Address,
   requester: Address,
   amountUsdc: number,
-): Promise<Hex> {
-  const { pub, wallet, account } = clients();
-  const hash = await wallet.writeContract({
-    address: stakeAddress(),
-    abi: stakeAbi,
-    functionName: "slash_stake",
-    args: [matchId, provider, requester, usdcAtomic(amountUsdc)],
-    account,
+): Promise<Hex> =>
+  sendTx({
+    pk: brokerPk(), address: stakeAddress(), abi: stakeAbi, functionName: "slash_stake",
+    args: [matchId, provider, requester, usdcAtomic(amountUsdc)], label: "slash_stake",
   });
-  const receipt = await pub.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") throw new Error(`slash_stake reverted: ${hash}`);
-  return hash;
-}
+
+/** On-chain bond status codes (BondedEscrow.vy). */
+export const BondStatus = { OPEN: 1, RELEASED: 2, SLASHED: 3, TIMEOUT_CLAIMED: 4 } as const;
 
 export async function getBond(matchId: Hex) {
-  const { pub } = clients();
-  const [poster, requester, amount, status, decision, deadline] = await pub.readContract({
+  const [poster, requester, amount, status, decision, deadline] = await arcPublic().readContract({
     address: escrowAddress(),
     abi: escrowAbi,
     functionName: "bonds",
     args: [matchId],
   });
-  // status: 1 OPEN, 2 RELEASED, 3 SLASHED, 4 TIMEOUT_CLAIMED
   return { poster, requester, amount, status, decisionHash: decision, deadline };
 }
 
@@ -219,13 +163,11 @@ export const arcscanTx = (hash: string): string => `https://testnet.arcscan.app/
 
 /** ERC-20 (6-dec) USDC balance of any address, as a float. */
 export async function usdcBalance(addr: Address): Promise<number> {
-  const { pub } = clients();
-  const raw = await pub.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [addr] });
+  const raw = await arcPublic().readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [addr] });
   return Number(raw) / 1e6;
 }
 
 /** Native (gas) balance in USDC (18-dec view). */
 export async function gasBalance(addr: Address): Promise<number> {
-  const { pub } = clients();
-  return Number(await pub.getBalance({ address: addr })) / 1e18;
+  return Number(await arcPublic().getBalance({ address: addr })) / 1e18;
 }
