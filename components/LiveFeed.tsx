@@ -33,13 +33,13 @@ export function LiveFeed({ initial }: { initial: FeedRow[] }) {
         const m = payload.new as Record<string, any>;
         if (!m?.id) return;
         // hydrate provider + task (realtime payload lacks joins)
-        const { data } = await sb.from("matches").select("id,created_at,status,bond_usdc,source,settle_tx,bond_tx,providers(name),quotes(task,confidence)").eq("id", m.id).single();
+        const { data } = await sb.from("matches").select("id,created_at,status,bond_usdc,price_usdc,source,settle_tx,bond_tx,providers(name),quotes(task,confidence)").eq("id", m.id).single();
         if (!data) return;
         const d = data as Record<string, any>;
         const row: FeedRow = {
           id: d.id, created_at: d.created_at, task: d.quotes?.task?.type ?? "task",
           provider: d.providers?.name ?? "—", confidence: d.quotes?.confidence ?? null,
-          bond: d.bond_usdc, status: toUiStatus(d.status), tx: d.settle_tx ?? d.bond_tx ?? null,
+          bond: d.bond_usdc, price: d.price_usdc, status: toUiStatus(d.status), tx: d.settle_tx ?? d.bond_tx ?? null,
           source: d.source ?? "organic",
         };
         setRows((prev) => [row, ...prev.filter((r) => r.id !== row.id)].slice(0, 40));

@@ -15,6 +15,7 @@ export interface FeedRow {
   provider: string;
   confidence: number | null;
   bond: number | null;
+  price: number | null;
   status: UiStatus;
   tx: string | null;
   source: string;
@@ -24,7 +25,7 @@ export async function getFeed(limit = 40): Promise<FeedRow[]> {
   const sb = supabasePublic();
   const { data } = await sb
     .from("matches")
-    .select("id,created_at,status,bond_usdc,source,settle_tx,bond_tx,providers(name),quotes(task,confidence)")
+    .select("id,created_at,status,bond_usdc,price_usdc,source,settle_tx,bond_tx,providers(name),quotes(task,confidence)")
     .order("created_at", { ascending: false })
     .limit(limit);
   return (data ?? []).map((m: Record<string, any>) => ({
@@ -34,6 +35,7 @@ export async function getFeed(limit = 40): Promise<FeedRow[]> {
     provider: m.providers?.name ?? "—",
     confidence: m.quotes?.confidence ?? null,
     bond: m.bond_usdc,
+    price: m.price_usdc,
     status: toUiStatus(m.status),
     tx: m.settle_tx ?? m.bond_tx ?? null,
     source: m.source ?? "organic",
@@ -45,6 +47,7 @@ export interface Totals {
   usdcSettled: number;
   bondsAtRisk: number;
   slashesCompensated: number;
+  slashedCount: number;
   organic: number;
   demand: number;
   openCount: number;
@@ -61,11 +64,45 @@ export async function getTotals(): Promise<Totals> {
     usdcSettled: settled.reduce((s, r) => s + Number(r.price_usdc ?? 0), 0),
     bondsAtRisk: rows.filter((r) => r.status === "bonded" || r.status === "paid").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
     slashesCompensated: rows.filter((r) => r.status === "failed_compensated").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
+    slashedCount: rows.filter((r) => r.status === "failed_compensated").length,
     organic: settled.filter((r) => r.source !== "demand_agent").length,
     demand: settled.filter((r) => r.source === "demand_agent").length,
     openCount: rows.filter((r) => r.status === "pending" || r.status === "bonded").length,
     paidCount: rows.filter((r) => ["paid", "delivered", "failed_compensated"].includes(r.status)).length,
   };
+}
+
+// One real settled bond, traced through its on-chain steps — powers the landing "follow one bond"
+// walkthrough. bond/verdict(validation_response)/settle/refund/slash are real tx hashes; the x402
+// payment is a batched Gateway settlement (no single hash), so the landing labels that step honestly.
+export interface WalkStep {
+  task: string; spec: string; provider: string; price: number; bond: number; conf: number; score: number;
+  bondTx: string; verdictTx: string | null; settleTx: string | null; refundTx: string | null; slashTx: string | null;
+}
+
+export async function getWalkthrough(): Promise<{ pass: WalkStep | null; slash: WalkStep | null }> {
+  const sb = supabasePublic();
+  const { data } = await sb
+    .from("matches")
+    .select("status,bond_usdc,price_usdc,bond_tx,settle_tx,validation_response_tx,refund_tx,stake_slash_tx,providers(name),quotes(task,confidence),validations(score)")
+    .in("status", ["delivered", "failed_compensated"])
+    .not("bond_tx", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(80);
+  const rows = (data ?? []) as Record<string, any>[];
+  const map = (m: Record<string, any>): WalkStep => {
+    const q = m.quotes ?? {}, t = q.task ?? {};
+    const v = Array.isArray(m.validations) ? m.validations[0] : m.validations;
+    return {
+      task: t.type ?? "task", spec: t.spec ?? "", provider: m.providers?.name ?? "provider",
+      price: Number(m.price_usdc ?? 0), bond: Number(m.bond_usdc ?? 0), conf: Number(q.confidence ?? 0),
+      score: Number(v?.score ?? 0), bondTx: m.bond_tx,
+      verdictTx: m.validation_response_tx, settleTx: m.settle_tx, refundTx: m.refund_tx, slashTx: m.stake_slash_tx,
+    };
+  };
+  const pass = rows.find((r) => r.status === "delivered" && r.settle_tx && r.validation_response_tx);
+  const slash = rows.find((r) => r.status === "failed_compensated" && (r.refund_tx || r.stake_slash_tx));
+  return { pass: pass ? map(pass) : null, slash: slash ? map(slash) : null };
 }
 
 export interface DecisionItem {

@@ -3,9 +3,22 @@ import "./globals.css";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
 
 export const metadata: Metadata = {
-  title: "ENGYE — The Bonded Broker",
+  metadataBase: new URL("https://engye.vercel.app"),
+  title: "ENGYE — the first AI that stakes its own money on its work",
   description:
-    "An AI broker that stakes USDC on its own judgment. Every match bonded on Arc. Every failure compensated.",
+    "ENGYE quotes your task, posts a USDC bond on Arc, and lets a public validator rule. Pass — the bond comes home. Fail — it's slashed and paid to you.",
+  openGraph: {
+    type: "website",
+    siteName: "ENGYE",
+    url: "https://engye.vercel.app",
+    title: "ENGYE — the AI that stakes its own money",
+    description: "Every task bonded on Arc. Every failure compensated.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ENGYE — the AI that stakes its own money",
+    description: "Every task bonded on Arc. Every failure compensated.",
+  },
 };
 
 // Responsive across ultrawide → iPhone SE. Zoom stays enabled (accessibility) — no maximum-scale.
