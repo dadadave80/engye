@@ -2,9 +2,8 @@
 // Passkey connect + sign on Circle Modular Wallets. Register/login a passkey → derive its MSCA →
 // register it server-side (passkey_accounts + a small USDC sponsor). Pay/stake/claim are gasless
 // userOps (Gas Station paymaster). Payment is a direct USDC transfer validated + bound server-side.
-import { encodeFunctionData, erc20Abi, type Hex } from "viem";
-import { USDC } from "@/lib/clientChain";
-import { registerCredential, loginCredential, accountFromCredential, sendCalls, type StoredCredential } from "@/lib/circleWallet";
+import { type Hex } from "viem";
+import { registerCredential, loginCredential, accountFromCredential, sendCalls, sendUsdcTransfer, type StoredCredential } from "@/lib/circleWallet";
 import type { PasskeySession } from "./passkey";
 import type { Call } from "@/lib/ithaca";
 
@@ -53,8 +52,9 @@ export async function payForQuote(session: PasskeySession, quoteId: string): Pro
   const probe = await fetch(`/api/broker/execute/${quoteId}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
   if (probe.status !== 402) throw new Error(`expected 402 requirements, got ${probe.status}`);
   const reqs = JSON.parse(atob(probe.headers.get("payment-required")!)).accepts[0];
-  const data = encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [reqs.payTo as `0x${string}`, BigInt(reqs.amount)] });
-  const hash = await sendCalls(session.credential, [{ to: USDC, value: 0n, data }]);
+  // Circle's canonical encodeTransfer (no `value` field) — a hand-rolled { to, value:0n, data } call
+  // had the bundler reject the userOp with "Missing or invalid parameters".
+  const hash = await sendUsdcTransfer(session.credential, reqs.payTo as `0x${string}`, BigInt(reqs.amount));
   const res = await fetch("/api/passkey/pay", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ quote_id: quoteId, account: session.address, tx_hash: hash }),

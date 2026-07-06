@@ -9,6 +9,9 @@ import { arcTestnet } from "viem/chains";
 import { createBundlerClient, toWebAuthnAccount, type WebAuthnAccount } from "viem/account-abstraction";
 import {
   WebAuthnMode,
+  ContractAddress,
+  encodeTransfer,
+  getUserOperationGasPrice,
   recoveryActions,
   toCircleSmartAccount,
   toModularTransport,
@@ -37,7 +40,20 @@ function clients() {
   return {
     passkeyTransport: toPasskeyTransport(clientUrl, clientKey),
     public: createPublicClient({ chain: arcTestnet, transport: modular }),
-    bundler: createBundlerClient({ chain: arcTestnet, transport: modular }),
+    // Fees MUST come from Circle's own gas oracle (circle_getUserOperationGasPrice). viem's default
+    // estimation doesn't work against Circle's Arc bundler → userOps ship with missing/invalid gas
+    // fields and the bundler rejects them ("Missing or invalid parameters"). This applies to every
+    // userOp: payment, stake, claim, recovery.
+    bundler: createBundlerClient({
+      chain: arcTestnet,
+      transport: modular,
+      userOperation: {
+        estimateFeesPerGas: async ({ bundlerClient }) => {
+          const gp = await getUserOperationGasPrice(bundlerClient);
+          return { maxFeePerGas: BigInt(gp.medium.maxFeePerGas), maxPriorityFeePerGas: BigInt(gp.medium.maxPriorityFeePerGas) };
+        },
+      },
+    }),
   };
 }
 
@@ -85,6 +101,21 @@ export async function sendCalls(credential: StoredCredential, calls: { to: Addre
   return receipt.transactionHash;
 }
 
+/** Send a gasless USDC transfer via Circle's canonical `encodeTransfer` (matches the SDK reference
+ *  exactly: `{ to: token, data }` with no `value`). Used for the passkey pay flow — hand-rolling the
+ *  call as `{ to, value: 0n, data }` had the bundler reject the userOp ("invalid parameters"). */
+export async function sendUsdcTransfer(credential: StoredCredential, to: Address, amount: bigint): Promise<Hex> {
+  const { bundler } = clients();
+  const account = await accountFromCredential(credential);
+  try {
+    const call = encodeTransfer(to, ContractAddress.ArcTestnet_USDC, amount);
+    const userOpHash = await bundler.sendUserOperation({ account, calls: [call], paymaster: true });
+    const { receipt } = await bundler.waitForUserOperationReceipt({ hash: userOpHash });
+    if (receipt.status !== "success") throw new Error("payment userOp reverted");
+    return receipt.transactionHash;
+  } catch (e) { throw friendlyUserOpError(e); }
+}
+
 // ---------- Passkey recovery (Circle Modular Wallets recoveryActions) ----------
 // SETUP (while the user still has the passkey): register an EOA WALLET OF THE USER'S CHOICE as a
 // recovery owner on the MSCA — the passkey signs the registration; the chosen wallet just supplies
@@ -98,7 +129,12 @@ function friendlyUserOpError(e: unknown): Error {
     return new Error("Gasless sponsorship is unavailable — the Circle Gas Station policy for Arc Testnet may not be active. " + msg);
   if (/exceeds balance|insufficient (funds|balance)/i.test(msg))
     return new Error("Your passkey account doesn't have enough USDC for gas yet — try again in a moment. " + msg);
-  return e instanceof Error ? e : new Error(msg);
+  // Surface the underlying JSON-RPC cause/details for unrecognised errors (e.g. a bundler's terse
+  // "Missing or invalid parameters") so the real reason isn't swallowed.
+  const cause = (e as { cause?: { message?: string } })?.cause?.message;
+  const details = (e as { details?: string })?.details;
+  const extra = [cause, details].find((x) => x && !msg.includes(x));
+  return new Error(extra ? `${msg} — ${extra}` : msg);
 }
 
 /** The MSCA deploys lazily on its first OUTBOUND userOp — a received sponsor doesn't deploy it — so
