@@ -26,8 +26,11 @@ the verdict flips. That's the whole video, with zero dead air.
 > "This is ENGYE — a broker you hire in a conversation. Watch what makes it different: it puts its
 > own money where its mouth is."
 
-- Type a real task (or tap a starter chip):
-  *"summarize https://en.wikipedia.org/wiki/Stablecoin into 3 bullets"*
+- Type a real task — use a **question-answering** task, e.g.:
+  *"What does HTTP status code 402 mean, and where is it famously used? Two sentences."*
+  *(Why this one: the Q&A provider has a deep pass record, so the broker reliably BONDS it —
+  `accept` with a real bond. A summarize task can come back best-effort with bond $0, which kills
+  the money shot. Verified live right before this script was written.)*
 - The QuoteCard renders live. **Point at the three numbers:**
 
 > "It quotes a price, states its honest confidence — and sizes a USDC bond from that confidence.
