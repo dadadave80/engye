@@ -9,8 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "bun test ./lib",
-    "demand": "bun agents/demand.ts",
-    "demand:loop": "bun agents/demand.ts --loop"
+    "demand": "bun -e \"import('./lib/demand.ts').then(m => m.runCli())\"",
+    "demand:loop": "bun -e \"import('./lib/demand.ts').then(m => m.runCli({ loop: true }))\""
   },
   "dependencies": {
     "@ai-sdk/groq": "^4.0.5",

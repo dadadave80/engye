@@ -13,8 +13,9 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       - run: bun install --frozen-lockfile
-      # secrets scoped to only this step, not checkout/setup
-      - run: bun agents/demand.ts --cycles 1
+      # secrets scoped to only this step, not checkout/setup. Runs one buy cycle from lib/demand
+      # (the demand logic moved there; agents/demand.ts was retired).
+      - run: bun run demand
         env:
           APP_URL: ${{ secrets.APP_URL }}
           RPC: ${{ secrets.RPC }}

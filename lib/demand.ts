@@ -1,7 +1,7 @@
-// Shared demand-agent logic — one autonomous buy cycle + a read-only status read. Consumed by BOTH
-// the headless cron entry (agents/demand.ts, which holds DEMAND_PRIVATE_KEY as a GitHub secret) and
-// the eve demand subagent (agent/subagents/demand/). Server-only: uses the service-role Supabase key
-// and the demand signing key.
+// Demand agent — the full module: buy-cycle logic (runCycle), a CLI runner (runCli), and a read-only
+// status read (demandStatus). Consumed by BOTH the GitHub cron / `demand:loop` (which invoke runCli
+// and hold DEMAND_PRIVATE_KEY) and the eve demand subagent (agent/subagents/demand/, read-only). No
+// loose agents/ entry file — the workflow calls `bun run demand` → runCli. Server-only.
 import { z } from "zod";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { decide } from "./llm";
@@ -123,6 +123,23 @@ export async function runCycle(): Promise<CycleOutcome> {
   const d = result.data as { status: string; verdict_due_at?: string };
   console.log(`outcome: ${d.status}${d.verdict_due_at ? ` (verdict due ${d.verdict_due_at})` : ""} — paid $${quote.total_price_usdc}`);
   return { status: "bought", detail: `paid $${quote.total_price_usdc}`, task: shortTask, price: Number(quote.total_price_usdc), result: { status: d.status, verdict_due_at: d.verdict_due_at } };
+}
+
+/** CLI runner for the cron + local loop. One cycle by default, `cycles` N, or an infinite `loop`
+ *  every 5 minutes. Lives here (not in a loose agents/ file) so the GitHub workflow + `demand:loop`
+ *  invoke it directly: `bun -e "import('./lib/demand.ts').then(m => m.runCli())"`. */
+export async function runCli(opts: { loop?: boolean; cycles?: number } = {}): Promise<void> {
+  const onError = (e: unknown) => console.error("cycle error:", e instanceof Error ? e.message : e);
+  if (opts.loop) {
+    for (;;) {
+      await runCycle().catch(onError);
+      await new Promise((r) => setTimeout(r, 5 * 60 * 1000));
+    }
+  }
+  const cycles = opts.cycles ?? 1;
+  for (let i = 0; i < cycles; i++) {
+    await runCycle().catch((e) => { onError(e); process.exitCode = 1; });
+  }
 }
 
 export interface DemandStatus {

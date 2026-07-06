@@ -1,10 +1,9 @@
 import { groq } from "@ai-sdk/groq";
 import { defineAgent } from "eve";
 
-// The autonomous demand buyer, as a declared eve subagent. Its buy-cycle logic is shared with the
-// headless cron (agents/demand.ts) via lib/demand.ts. Live buying runs on the schedule (the cron
-// holds the signing key); here the broker can delegate demand-desk questions or, where the key is
-// present, kick a cycle.
+// The autonomous demand buyer, as a declared eve subagent. Its buy-cycle logic lives in lib/demand.ts
+// and is shared with the GitHub cron (which runs `bun run demand` → runCli and holds the signing
+// key). This subagent is read-only — the broker delegates demand-desk questions to it.
 export default defineAgent({
   description:
     "The autonomous demand buyer: drafts small tasks, judges the broker's bonded quote against a daily USDC budget, and buys only the ones worth it. Delegate here to report demand-side activity/budget, or (where the signing key is present) run one buy cycle.",
