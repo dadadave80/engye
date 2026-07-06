@@ -126,7 +126,7 @@ export function HireChat() {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ThreadPrimitive.Root className="chat" style={{ height: "calc(100dvh - 300px)", minHeight: 460 }}>
+      <ThreadPrimitive.Root className="chat">
         <div className="chat-head">
           <ObolMark size={16} simple />
           <span>engye broker · arc testnet · bonded quotes are free</span>

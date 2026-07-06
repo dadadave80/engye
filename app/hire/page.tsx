@@ -5,7 +5,7 @@ export const metadata = { title: "Hire ENGYE — the bonded broker" };
 
 export default function HirePage() {
   return (
-    <AppShell>
+    <AppShell fill>
       <div className="page-head">
         <p className="kicker">The Concierge</p>
         <h1>Hire the broker.</h1>

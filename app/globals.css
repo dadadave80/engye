@@ -889,6 +889,8 @@ pre.code .k { color: var(--accent-ink); }
 .chat-head .obol-mark { color: var(--accent); }
 .chat-log {
   flex: 1;
+  min-height: 0; /* let the log shrink & scroll instead of pushing the composer down */
+  overflow-y: auto;
   padding: var(--space-6);
   display: flex;
   flex-direction: column;
@@ -977,6 +979,37 @@ pre.code .k { color: var(--accent-ink); }
   border-top: 1px solid var(--line);
 }
 .chat-input input { flex: 1; }
+
+/* ---------- Full-viewport chat routes (/hire) ---------- */
+/* The presence of main.app-main-fill turns the whole page into a fixed-height column, so the chat's
+   composer stays pinned in view at EVERY screen height — the page never document-scrolls; only the
+   message log scrolls, internally. :has() drives it off the class alone, so there is no magic
+   header-height offset: the header keeps its natural height and main flexes into the rest. */
+body:has(main.app-main-fill) {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+main.app-main-fill {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+main.app-main-fill > .container {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* the hero keeps its natural height; the chat card fills what's left, pinning its composer */
+main.app-main-fill .chat { flex: 1; min-height: 0; }
+/* short / landscape viewports: trim the hero so the log keeps usable room */
+@media (max-height: 720px) {
+  main.app-main-fill .page-head { padding-block: var(--space-5) var(--space-4); }
+}
 
 /* ---------- 14. Verdict feed (Agora) ---------- */
 
