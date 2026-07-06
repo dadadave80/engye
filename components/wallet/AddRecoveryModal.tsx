@@ -3,6 +3,7 @@
 // and take its address from the connection (no error-prone pasting). The chosen address is then
 // authorized as a super-admin recovery key by the caller (passkey signs; ENGYE relays).
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useConnectors, type Connector } from "wagmi";
 import { ShieldCheck, ChevronRight, X } from "lucide-react";
 
@@ -38,7 +39,10 @@ export function AddRecoveryModal({ onSelect, onClose }: { onSelect: (address: `0
     } finally { setBusy(null); }
   }
 
-  return (
+  // Portal to <body> so the fixed overlay always sizes to the viewport (a filtered/transformed
+  // ancestor would otherwise become its containing block — see ConnectModal).
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div style={overlay} onClick={onClose}>
       <div style={card} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "flex-end", padding: "10px 12px 0" }}>
@@ -75,6 +79,7 @@ export function AddRecoveryModal({ onSelect, onClose }: { onSelect: (address: `0
           {err && <div style={{ fontSize: 12.5, color: "var(--oxblood-badge)", textAlign: "center" }}>{err}</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

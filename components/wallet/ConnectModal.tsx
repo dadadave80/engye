@@ -3,6 +3,7 @@
 // plus a browser-wallet (EOA) option for the x402 pay flow. Backed by the Porto Key +
 // self-relay flow (the authentic id.porto.sh dialog can't serve Arc — see the design note).
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useConnect } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { ScanFace, Fingerprint, Wallet, Check, X, ChevronRight, ExternalLink } from "lucide-react";
@@ -51,7 +52,12 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
     else run(loginPasskey); // returning user, no local session → pick an existing passkey
   }
 
-  return (
+  // Portal to <body> so the fixed overlay escapes the header's containing block. The sticky
+  // .site-header has `backdrop-filter`, which (like transform/filter) makes it the containing
+  // block for `position: fixed` descendants — rendered in-place, `inset: 0` would size to the
+  // header, not the viewport (modal pinned to the top, no full-page scrim).
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div style={overlay} onClick={onClose}>
       <div style={card} onClick={(e) => e.stopPropagation()}>
         {/* header */}
@@ -152,6 +158,7 @@ export function ConnectModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
