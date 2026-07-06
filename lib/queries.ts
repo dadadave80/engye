@@ -1,12 +1,17 @@
-// Dashboard data layer — reads the public tables and shapes them for the UI.
+// Dashboard data layer — reads the public tables and shapes them for the UI. Status semantics come
+// from the lifecycle rulebook (lib/matchLifecycle.ts) — no hand-spelled status strings here.
 import { supabasePublic } from "./supabase/public";
+import { TERMINAL, isAtRisk, isSettled, outcome, type MatchStatus } from "./matchLifecycle";
 
 export type UiStatus = "PASS" | "SLASHED" | "OPEN";
 export function toUiStatus(matchStatus: string): UiStatus {
-  if (matchStatus === "delivered") return "PASS";
-  if (matchStatus === "failed_compensated") return "SLASHED";
-  return "OPEN";
+  const o = outcome({ status: matchStatus });
+  return o === "slashed" ? "SLASHED" : o === "passed" || o === "best_effort" ? "PASS" : "OPEN";
 }
+
+// dashboard-local stage groups, typed against the rulebook so a status rename is a compile error
+const OPEN_STAGES: readonly MatchStatus[] = ["pending", "bonded"];
+const PAID_STAGES: readonly MatchStatus[] = ["paid", ...TERMINAL];
 
 export interface FeedRow {
   id: string;
@@ -58,17 +63,17 @@ export async function getTotals(): Promise<Totals> {
   const sb = supabasePublic();
   const { data } = await sb.from("matches").select("status,price_usdc,bond_usdc,source");
   const rows = data ?? [];
-  const settled = rows.filter((r) => r.status === "delivered" || r.status === "failed_compensated");
+  const settled = rows.filter((r) => isSettled(r.status));
   return {
     matchesSettled: settled.length,
     usdcSettled: settled.reduce((s, r) => s + Number(r.price_usdc ?? 0), 0),
-    bondsAtRisk: rows.filter((r) => r.status === "bonded" || r.status === "paid").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
-    slashesCompensated: rows.filter((r) => r.status === "failed_compensated").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
-    slashedCount: rows.filter((r) => r.status === "failed_compensated").length,
+    bondsAtRisk: rows.filter((r) => isAtRisk(r.status)).reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
+    slashesCompensated: rows.filter((r) => outcome(r) === "slashed").reduce((s, r) => s + Number(r.bond_usdc ?? 0), 0),
+    slashedCount: rows.filter((r) => outcome(r) === "slashed").length,
     organic: settled.filter((r) => r.source !== "demand_agent").length,
     demand: settled.filter((r) => r.source === "demand_agent").length,
-    openCount: rows.filter((r) => r.status === "pending" || r.status === "bonded").length,
-    paidCount: rows.filter((r) => ["paid", "delivered", "failed_compensated"].includes(r.status)).length,
+    openCount: rows.filter((r) => (OPEN_STAGES as readonly string[]).includes(r.status)).length,
+    paidCount: rows.filter((r) => (PAID_STAGES as readonly string[]).includes(r.status)).length,
   };
 }
 
@@ -85,7 +90,7 @@ export async function getWalkthrough(): Promise<{ pass: WalkStep | null; slash: 
   const { data } = await sb
     .from("matches")
     .select("status,bond_usdc,price_usdc,bond_tx,settle_tx,validation_response_tx,refund_tx,stake_slash_tx,providers(name),quotes(task,confidence),validations(score)")
-    .in("status", ["delivered", "failed_compensated"])
+    .in("status", [...TERMINAL])
     .not("bond_tx", "is", null)
     .order("created_at", { ascending: false })
     .limit(80);
@@ -100,8 +105,8 @@ export async function getWalkthrough(): Promise<{ pass: WalkStep | null; slash: 
       verdictTx: m.validation_response_tx, settleTx: m.settle_tx, refundTx: m.refund_tx, slashTx: m.stake_slash_tx,
     };
   };
-  const pass = rows.find((r) => r.status === "delivered" && r.settle_tx && r.validation_response_tx);
-  const slash = rows.find((r) => r.status === "failed_compensated" && (r.refund_tx || r.stake_slash_tx));
+  const pass = rows.find((r) => outcome(r) === "passed" && r.settle_tx && r.validation_response_tx);
+  const slash = rows.find((r) => outcome(r) === "slashed" && (r.refund_tx || r.stake_slash_tx));
   return { pass: pass ? map(pass) : null, slash: slash ? map(slash) : null };
 }
 
@@ -147,7 +152,7 @@ export async function getCalibration(): Promise<CalibrationBucket[]> {
   const { data } = await sb
     .from("matches")
     .select("status,quotes(confidence)")
-    .in("status", ["delivered", "failed_compensated"]);
+    .in("status", [...TERMINAL]);
   const rows = (data ?? []) as unknown as Array<{ status: string; quotes: { confidence: number | null } | null }>;
   const buckets: CalibrationBucket[] = [];
   for (let lo = 0.5; lo < 1.0 - 1e-9; lo += 0.05) {
@@ -156,7 +161,7 @@ export async function getCalibration(): Promise<CalibrationBucket[]> {
       const c = r.quotes?.confidence;
       return c != null && c >= lo && c < (hi >= 0.999 ? 1.001 : hi);
     });
-    const passes = inBucket.filter((r) => r.status === "delivered").length;
+    const passes = inBucket.filter((r) => outcome(r) !== "slashed").length; // settled and not slashed = passed (either kind)
     buckets.push({
       stated: Math.round((lo + 0.025) * 100) / 100,
       realized: inBucket.length ? passes / inBucket.length : 0,

@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { keccak256, toBytes, type Address, type Hex } from "viem";
 import { supabaseAdmin } from "@/lib/db";
+import { supabaseMatchForward } from "@/lib/matchStore";
 import { buildRequirements, paymentRequired, verifyAndSettle, payEndpoint, ensureGatewayFloat } from "@/lib/x402";
 import { createBond, arcscanTx } from "@/lib/escrow";
 import { requestValidation } from "@/lib/erc8004";
@@ -94,15 +95,13 @@ export async function POST(
     prompt_hash: decisionRow?.prompt_hash ?? null, model: decisionRow?.model ?? null,
   });
 
-  const { data: match } = await supabaseAdmin
-    .from("matches")
-    .insert({
-      quote_id: id, provider_id: provider.id, match_key: matchKey, status: "pending",
-      decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
-      price_usdc: quote.total_price_usdc,
-      source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
-    })
-    .select().single();
+  const matches = supabaseMatchForward()!; // supabaseAdmin non-null was checked above
+  const match = await matches.insertMatch({
+    quote_id: id, provider_id: provider.id, match_key: matchKey,
+    decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
+    price_usdc: quote.total_price_usdc,
+    source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
+  });
   await supabaseAdmin.from("quotes").update({ status: "executed" }).eq("id", id); // was 'executing'
 
   const txs: Record<string, string> = {};
@@ -121,7 +120,7 @@ export async function POST(
           providerPrivateKey: providerPk,
         });
       }
-      await supabaseAdmin.from("matches").update({ status: "bonded", bond_tx: txs.bond_tx, validation_request_tx: txs.validation_request_tx ?? null }).eq("id", match.id);
+      await matches.markBonded(match.id, { bondTx: txs.bond_tx, validationRequestTx: txs.validation_request_tx ?? null });
     }
 
     // rail A outbound: ENGYE pays the provider
@@ -134,7 +133,7 @@ export async function POST(
     );
     const deliverable = result.data;
     txs.pay_tx = String(result.transaction ?? "");
-    await supabaseAdmin.from("matches").update({ status: "paid", pay_tx: txs.pay_tx, deliverable }).eq("id", match.id);
+    await matches.markPaid(match.id, { payTx: txs.pay_tx, deliverable });
 
     // Phase A ends at delivery: verdict + settlement run after the public window (spec §3.1-3.2).
     // Only BONDED matches get the 120s public window — an unbonded (best-effort) match has no bond
@@ -142,9 +141,7 @@ export async function POST(
     // of tying up a 2-min serverless invocation for a verdict nobody acts on.
     const windowSeconds = bonded ? VERDICT_WINDOW_SECONDS : 0;
     const verdictDueAt = new Date(Date.now() + windowSeconds * 1000).toISOString();
-    await supabaseAdmin.from("matches").update({
-      status: "awaiting_verdict", verdict_due_at: verdictDueAt, requester_wallet: requester,
-    }).eq("id", match.id);
+    await matches.markAwaitingVerdict(match.id, { verdictDueAt, requesterWallet: requester });
 
     if (process.env.ENGYE_DISABLE_AFTER !== "1") {
       after(async () => {
@@ -166,7 +163,7 @@ export async function POST(
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error(`[execute ${id}] lifecycle error:`, message);
-    await supabaseAdmin.from("matches").update({ status: "error" }).eq("id", match.id);
+    await matches.markError(match.id);
     return NextResponse.json(
       { error: "lifecycle failed", message, match_key: matchKey,
         note: "if a bond was posted, claim_timeout() releases it to the requester after the deadline" },

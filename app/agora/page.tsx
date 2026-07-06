@@ -6,6 +6,7 @@ import { Floor } from "@/components/agora/Floor";
 import { shapeLive, shapeVerdict, type VerdictRow } from "@/components/agora/shape";
 import { supabasePublic } from "@/lib/supabase/public";
 import { getTotals } from "@/lib/queries";
+import { IN_VERDICT_WINDOW, TERMINAL } from "@/lib/matchLifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,12 @@ export default async function AgoraPage() {
   // tasks have bond_usdc 0 and no bond_tx, so "bond released" copy would be wrong for them).
   const { data: liveRows } = await sb
     .from("matches").select(LIVE_SELECT)
-    .in("status", ["awaiting_verdict", "validating", "settle_retry"])
+    .in("status", [...IN_VERDICT_WINDOW])
     .gt("bond_usdc", 0)
     .order("verdict_due_at", { ascending: true });
   const { data: feedRows } = await sb
     .from("matches").select(VERDICT_SELECT)
-    .in("status", ["delivered", "failed_compensated"])
+    .in("status", [...TERMINAL])
     .gt("bond_usdc", 0)
     .order("settled_at", { ascending: false })
     .limit(15);

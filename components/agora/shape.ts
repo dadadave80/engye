@@ -1,6 +1,7 @@
 // Shared row-shaping for /agora. The server page (initial fetch) and the client Floor (realtime
 // re-hydrate) both map the same joined `matches` row into these view models — keep the mapping in
 // ONE place so the two paths can't silently diverge as the schema evolves.
+import { outcome } from "@/lib/matchLifecycle";
 
 export interface LiveMatch {
   id: string;
@@ -37,7 +38,7 @@ export function shapeLive(d: Record<string, any>): LiveMatch {
 
 export function shapeVerdict(d: Record<string, any>): VerdictRow | null {
   const status: "PASS" | "SLASHED" | null =
-    d.status === "delivered" ? "PASS" : d.status === "failed_compensated" ? "SLASHED" : null;
+    outcome(d) === "slashed" ? "SLASHED" : outcome(d) === "passed" || outcome(d) === "best_effort" ? "PASS" : null;
   if (!status) return null;
   return {
     id: d.id, match_key: d.match_key, status, tx: d.settle_tx ?? d.bond_tx ?? null,

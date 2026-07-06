@@ -4,6 +4,7 @@
 // the MatchStore interface, so a fake store drives the state machine in-memory in tests.
 import type { Hex } from "viem";
 import { supabaseAdmin } from "./db";
+import { CLAIMABLE, TERMINAL, legalFroms, type MatchStatus, type TerminalStatus } from "./matchLifecycle";
 
 export interface SettleQuoteJoin {
   task: { spec: string; quality_bar?: string };
@@ -24,7 +25,7 @@ export interface SettleMatchRow {
   id: string;
   match_key: Hex;
   created_at: string;
-  status: string;
+  status: MatchStatus;
   bond_tx: string | null;
   validation_request_tx: string | null;
   validation_response_tx: string | null;
@@ -46,7 +47,7 @@ export interface Verdict {
 
 /** Terminal-status write: only tx hashes THIS attempt produced — omitted columns stay untouched. */
 export interface FinalizeUpdate {
-  status: "delivered" | "failed_compensated";
+  status: TerminalStatus;
   latencyMs: number;
   settleTx?: string;
   refundTx?: string;
@@ -80,6 +81,55 @@ export interface MatchStore {
   tailCandidates(limit: number): Promise<TailRow[]>;
 }
 
+/** The execute route's forward-path writes — the other half of the lifecycle, same bouncer. */
+export interface InsertMatchRow {
+  quote_id: string;
+  provider_id: string;
+  match_key: Hex;
+  decision_json: unknown;
+  bond_usdc: number | string | null;
+  price_usdc: number | string | null;
+  source: string;
+}
+
+export interface MatchForward {
+  /** Creates the match at 'pending'. */
+  insertMatch(row: InsertMatchRow): Promise<{ id: string }>;
+  markBonded(id: string, tx: { bondTx: string; validationRequestTx?: string | null }): Promise<void>;
+  markPaid(id: string, upd: { payTx: string; deliverable: unknown }): Promise<void>;
+  markAwaitingVerdict(id: string, upd: { verdictDueAt: string; requesterWallet: string }): Promise<void>;
+  /** Best-effort from the route's catch — guarded so it can never resurrect a terminal match. */
+  markError(id: string): Promise<void>;
+}
+
+export function supabaseMatchForward(): MatchForward | null {
+  const sb = supabaseAdmin;
+  if (!sb) return null;
+  // the bouncer: UPDATE … WHERE status IN legalFroms(to). Zero rows = an illegal jump — loud on the
+  // forward path (it means concurrent mutation the quote's atomic claim should make impossible).
+  const guarded = async (id: string, to: MatchStatus, patch: Record<string, unknown>) => {
+    const { data, error } = await sb.from("matches").update({ status: to, ...patch }).eq("id", id)
+      .in("status", legalFroms(to)).select("id");
+    if (error) throw new Error(`match → ${to} write failed: ${error.message}`);
+    if (!data?.length) throw new Error(`illegal transition: match ${id} is not in [${legalFroms(to).join("|")}] — refused → ${to}`);
+  };
+  return {
+    async insertMatch(row) {
+      const { data, error } = await sb.from("matches").insert({ ...row, status: "pending" satisfies MatchStatus }).select("id").single();
+      if (error || !data) throw new Error(`match insert failed: ${error?.message ?? "no row returned"}`);
+      return { id: data.id };
+    },
+    markBonded: (id, t) => guarded(id, "bonded", { bond_tx: t.bondTx, validation_request_tx: t.validationRequestTx ?? null }),
+    markPaid: (id, u) => guarded(id, "paid", { pay_tx: u.payTx, deliverable: u.deliverable }),
+    markAwaitingVerdict: (id, u) => guarded(id, "awaiting_verdict", { verdict_due_at: u.verdictDueAt, requester_wallet: u.requesterWallet }),
+    async markError(id) {
+      // quiet 0-rows: erroring is the catch path — refusing to resurrect a terminal match matters;
+      // throwing inside the route's error handler doesn't.
+      await sb.from("matches").update({ status: "error" satisfies MatchStatus }).eq("id", id).in("status", legalFroms("error"));
+    },
+  };
+}
+
 const SETTLE_JOIN = "*, quotes(task,total_price_usdc,action,requester_wallet), providers(id,wallet_address,agent_id,price_usdc)";
 
 /** The real store over supabaseAdmin; null when persistence isn't configured. */
@@ -93,7 +143,7 @@ export function supabaseMatchStore(): MatchStore | null {
         .from("matches")
         .update({ status: "validating", validating_at: new Date().toISOString() })
         .eq("id", matchId)
-        .or(`status.in.(awaiting_verdict,settle_retry,error),and(status.eq.validating,validating_at.lt.${staleBefore})`)
+        .or(`status.in.(${CLAIMABLE.join(",")}),and(status.eq.validating,validating_at.lt.${staleBefore})`)
         .select(SETTLE_JOIN)
         .single();
       return (data as unknown as SettleMatchRow) ?? null;
@@ -116,15 +166,22 @@ export function supabaseMatchStore(): MatchStore | null {
     },
 
     async finalizeMatch(matchId, upd) {
-      const row: Record<string, unknown> = { status: upd.status, settled_at: new Date().toISOString(), latency_ms: upd.latencyMs };
-      if (upd.settleTx) row.settle_tx = upd.settleTx;
-      if (upd.refundTx) row.refund_tx = upd.refundTx;
-      if (upd.stakeSlashTx) row.stake_slash_tx = upd.stakeSlashTx;
-      await sb.from("matches").update(row).eq("id", matchId);
+      const hashes: Record<string, unknown> = {};
+      if (upd.settleTx) hashes.settle_tx = upd.settleTx;
+      if (upd.refundTx) hashes.refund_tx = upd.refundTx;
+      if (upd.stakeSlashTx) hashes.stake_slash_tx = upd.stakeSlashTx;
+      const row = { status: upd.status, settled_at: new Date().toISOString(), latency_ms: upd.latencyMs, ...hashes };
+      const { data } = await sb.from("matches").update(row).eq("id", matchId)
+        .in("status", legalFroms(upd.status)).select("id");
+      if (!data?.length && Object.keys(hashes).length) {
+        // a racer finalized first (same canonical verdict → same status). Never lose an on-chain
+        // fact this attempt produced: patch the tx hashes WITHOUT touching the terminal status.
+        await sb.from("matches").update(hashes).eq("id", matchId);
+      }
     },
 
     async markRetry(matchId) {
-      await sb.from("matches").update({ status: "settle_retry" }).eq("id", matchId);
+      await sb.from("matches").update({ status: "settle_retry" }).eq("id", matchId).eq("status", "validating");
     },
 
     async recordTailTx(matchId, col, tx) {
@@ -148,7 +205,7 @@ export function supabaseMatchStore(): MatchStore | null {
       const { data } = await sb
         .from("matches")
         .select("id,match_key,created_at,deliverable,validation_request_tx,validation_response_tx,feedback_tx,providers(id,wallet_address,agent_id,price_usdc),validations(pass,score)")
-        .in("status", ["delivered", "failed_compensated"])
+        .in("status", [...TERMINAL])
         .not("validation_request_tx", "is", null)
         .is("validation_response_tx", null)
         .order("settled_at", { ascending: true }).limit(limit);

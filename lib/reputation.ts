@@ -1,5 +1,6 @@
 // Provider reputation: snapshot for the broker's context window, aggregate updates after settle.
 import { supabaseAdmin } from "./db";
+import { TERMINAL, outcome } from "./matchLifecycle";
 import { calibratedConfidence } from "./economics";
 
 export interface ProviderRow {
@@ -37,7 +38,7 @@ export async function brokerContext(): Promise<{ providers: ProviderRow[]; table
         await supabaseAdmin
           .from("matches")
           .select("provider_id,status,created_at")
-          .in("status", ["delivered", "failed_compensated"])
+          .in("status", [...TERMINAL])
           .order("created_at", { ascending: false })
           .limit(40)
       ).data ?? []
@@ -46,7 +47,7 @@ export async function brokerContext(): Promise<{ providers: ProviderRow[]; table
     recent
       .filter((m) => m.provider_id === id)
       .slice(0, 5)
-      .map((m) => (m.status === "delivered" ? "P" : "F"))
+      .map((m) => (outcome(m) === "slashed" ? "F" : "P"))
       .join("") || "-";
   // short aliases (P1, P2, …) — LLMs mis-transcribe UUIDs; the server maps back
   const table = providers

@@ -1,6 +1,7 @@
 "use client";
 // Live verdict bubble: countdown → realtime verdict from the matches row (spec §4.4).
 // Visuals adopted from design-system/import/market/VerdictWatch.jsx (counting / resolved).
+import { isTerminal, outcome } from "@/lib/matchLifecycle";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { Clock, ArrowRight } from "lucide-react";
@@ -28,13 +29,13 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
     const sb = createClient(url, anon, { auth: { persistSession: false } });
     const check = async () => {
       const { data } = await sb.from("matches").select("status,settle_tx,refund_tx,stake_slash_tx,price_usdc,bond_usdc").eq("match_key", matchKey).single();
-      if (data && ["delivered", "failed_compensated"].includes(data.status)) setRow(data);
+      if (data && isTerminal(data.status)) setRow(data);
     };
     // subscribe FIRST, then check once the channel is live — otherwise a verdict landing in the gap
     // between an early check() and the subscription going live would be missed (stuck countdown).
     const ch = sb.channel(`verdict-${matchKey}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "matches", filter: `match_key=eq.${matchKey}` },
-        (p) => { const m = p.new as Record<string, any>; if (["delivered", "failed_compensated"].includes(m.status)) setRow(m); })
+        (p) => { const m = p.new as Record<string, any>; if (isTerminal(m.status)) setRow(m); })
       .subscribe((status) => { if (status === "SUBSCRIBED") void check(); });
     return () => { sb.removeChannel(ch); };
   }, [matchKey]);
@@ -42,7 +43,7 @@ export function VerdictWatch({ matchKey, dueAt, bondTx }: { matchKey: string; du
   const shell: CSSProperties = { border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: 16 };
 
   if (row) {
-    const passed = row.status === "delivered";
+    const passed = outcome(row) !== "slashed";
     const tint = passed ? "var(--laurel)" : "var(--oxblood)";
     const links = ([["bond", bondTx], ["settle", row.settle_tx], ["refund", row.refund_tx], ["stake slash", row.stake_slash_tx]] as const)
       .filter(([, tx]) => tx);

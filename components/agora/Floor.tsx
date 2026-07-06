@@ -2,6 +2,7 @@
 // /agora — the watch-only floor (spec §6). Two sections sharing one realtime subscription:
 // live matches inside their verdict window, and a feed of recent terminal verdicts.
 // Skinned to the handoff: stamped seals, .verdicts list, .floor-empty quiet state.
+import { IN_VERDICT_WINDOW } from "@/lib/matchLifecycle";
 import { useEffect, useState, memo } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
@@ -11,7 +12,7 @@ import { shapeLive, shapeVerdict, type LiveMatch, type VerdictRow } from "./shap
 
 export type { LiveMatch, VerdictRow };
 
-const LIVE_STATUSES = new Set(["awaiting_verdict", "validating", "settle_retry"]);
+const LIVE_STATUSES = new Set<string>(IN_VERDICT_WINDOW);
 
 const DRAMA: Record<"PASS" | "SLASHED", string> = {
   PASS: "bond released back to the broker.",

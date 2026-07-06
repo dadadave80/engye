@@ -6,6 +6,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { supabasePublic, txUrl } from "@/lib/supabase/public";
 import { VERDICT_WINDOW_SECONDS } from "@/lib/economics";
+import { TERMINAL as TERMINAL_STATUSES, outcome } from "@/lib/matchLifecycle";
 
 const mono: CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 
@@ -41,9 +42,9 @@ export type MatchRow = {
 // keep in lockstep with the server page's select() — used to refresh joins on realtime UPDATEs
 const SELECT = "*, quotes(task,confidence,bond_usdc,total_price_usdc,reasoning), providers(name), validations(pass,score,reasons,model)";
 
-const TERMINAL = new Set(["delivered", "failed_compensated"]);
-const sealFor = (status: string) => status === "delivered" ? "seal-pass" : status === "failed_compensated" ? "seal-slashed" : "seal-open";
-const sealText = (status: string) => status === "delivered" ? "PASS" : status === "failed_compensated" ? "SLASHED" : "OPEN";
+const TERMINAL = new Set<string>(TERMINAL_STATUSES);
+const sealFor = (status: string) => outcome({ status }) === "slashed" ? "seal-slashed" : TERMINAL.has(status) ? "seal-pass" : "seal-open";
+const sealText = (status: string) => outcome({ status }) === "slashed" ? "SLASHED" : TERMINAL.has(status) ? "PASS" : "OPEN";
 
 function fmtClock(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -108,7 +109,7 @@ export function MatchDetail({ initial, matchKey }: { initial: MatchRow; matchKey
   const progress = msLeft != null ? Math.min(1, Math.max(0, msLeft / (VERDICT_WINDOW_SECONDS * 1000))) : 0;
   // ground truth for "which way the money moved" — tied to m.status (mirrors the seal), so an
   // unbonded best-effort delivery ("delivered") never renders the slashed copy.
-  const passed = terminal ? m.status !== "failed_compensated" : null;
+  const passed = terminal ? outcome(m) !== "slashed" : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 760, margin: "0 auto" }}>
