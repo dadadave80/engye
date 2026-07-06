@@ -70,6 +70,7 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --space-section: clamp(4rem, 3rem + 4vw, 7rem);
+  --header-h: 68px; /* fixed site-header box: 58 row + 9 meander + 1 border */
 
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -190,7 +191,7 @@
 *::before,
 *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; max-width: 100%; overflow-x: hidden; }
+html { -webkit-text-size-adjust: 100%; max-width: 100%; overflow-x: hidden; scroll-padding-top: var(--header-h); }
 
 body {
   margin: 0;
@@ -284,8 +285,10 @@ code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
 /* ---------- 3. Header / nav ---------- */
 
 .site-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
   background: var(--bg);
   background: color-mix(in srgb, var(--bg) 88%, transparent);
@@ -613,6 +616,9 @@ code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
 }
 
 main { padding-bottom: var(--space-section); }
+/* the header is position:fixed (out of flow) — offset the app-shell main so content clears it.
+   scoped to #main-content so the landing (its own in-flow header) is untouched. */
+#main-content { padding-top: var(--header-h); }
 
 .section { margin-top: var(--space-12); }
 .section-title {

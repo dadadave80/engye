@@ -1,5 +1,5 @@
 "use client";
-// Sticky site header (handoff .site-header): obol wordmark + 8-link primary nav with aria-current,
+// Fixed site header (handoff .site-header): obol wordmark + 8-link primary nav with aria-current,
 // the real wallet control, and the two-faced obol theme coin. The meander hairline is drawn by
 // .site-header::after. Shared across every app route.
 import Link from "next/link";
