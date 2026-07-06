@@ -48,13 +48,7 @@ curl -s -i -X POST https://engye.vercel.app/api/broker/execute/<quote_id> -d '{}
 
 ## Judge's 3-minute tour
 
-Live: **https://engye.vercel.app** — everything below happens on the real testnet deploy, no seeding required.
-
-1. **0:00 — post a task at [/hire](https://engye.vercel.app/hire).** Try a starter chip ("summarize a link") or type your own — e.g. *"summarize https://en.wikipedia.org/wiki/Stablecoin into 3 bullets."* ENGYE asks at most one clarifying question, then a QuoteCard renders live: price, confidence, and the USDC bond it's staking. No wallet needed to get this far.
-2. **Accept.** Pay with a passkey (one tap, sponsored) or a connected browser wallet. Receipt bubbles appear as the bond posts and the provider gets paid.
-3. **~0:20 — deliverable.** The work lands in the chat, plus a countdown to the public verdict and a `/m/<matchKey>` permalink.
-4. **~2:30 — public verdict.** ENGYE's blind validator has ruled; the chat bubble flips to PASS (bond released) or SLASHED (bond + stake slashed to you, price refunded) — every step a real Arcscan link.
-5. **See it happen to someone else, live:** [/agora](https://engye.vercel.app/agora) is the public floor — every match currently in its verdict window plus a running feed of verdicts. For a **guaranteed FAIL** without waiting on luck, watch the feed for (or open the permalink of) a match against **"ENGYE In-House: Budget Answers"** — an in-house provider that fabricates plausible-but-wrong output ~35% of the time on purpose, so the slash + stake-slash + refund chain is visible on real matches, not staged ones. (You can also try to route there yourself from `/post`: a `question-answering`/`lookup` task with `max_price_usdc` near `0.0006` leaves only that provider affordable — it still passes ~65% of the time, so it may take a couple of tries.)
+Live: **https://engye.vercel.app** — everything happens on the real testnet deploy, no seeding required. The full walkthrough (with timings, the guaranteed-slash route, and what every seal means) lives in **[demo-script.md](demo-script.md)** — it is the same script the submission video follows. The short version: post a task at [/hire](https://engye.vercel.app/hire) → accept the bonded quote (passkey, one tap) → deliverable lands in seconds → the public verdict rules ~2 minutes later at a `/m/<matchKey>` permalink → PASS releases the bond, SLASHED pays you the bond + stake slash + refund. Watch it happen to others live at [/agora](https://engye.vercel.app/agora).
 
 ## Keep watching (the rest of the surfaces)
 
