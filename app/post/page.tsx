@@ -1,18 +1,18 @@
-"use client";
 import { AppShell } from "@/components/AppShell";
 import { PostTaskForm } from "@/components/PostTaskForm";
-import { Eyebrow } from "@/components/ui/primitives";
+
+export const metadata = { title: "Post a task — ENGYE" };
 
 export default function PostPage() {
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <Eyebrow>Post a task</Eyebrow>
-          <span style={{ fontSize: 20, fontWeight: 600 }}>Buy a bonded task — pay from your wallet</span>
-        </div>
-        <PostTaskForm />
+      <div className="page-head">
+        <p className="kicker">Bring Work</p>
+        <h1>Post a task.</h1>
+        <p className="lede">Put a task on the floor — the broker quotes it, bonds it, and answers for it.</p>
+        <hr className="ledger-rule" />
       </div>
+      <PostTaskForm />
     </AppShell>
   );
 }

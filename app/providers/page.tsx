@@ -1,67 +1,65 @@
 import { AppShell } from "@/components/AppShell";
-import { Card, Eyebrow, AddressChip, EmptyState } from "@/components/ui/primitives";
 import { ProviderOnboarding } from "@/components/ProviderOnboarding";
 import { getProviders, getTotals } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const th: React.CSSProperties = { textAlign: "left", padding: "8px 12px", fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--muted-foreground)", borderBottom: "1px solid var(--border)" };
-const td: React.CSSProperties = { padding: "10px 12px", fontSize: 14, borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" };
-const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
 const ARCSCAN = "https://testnet.arcscan.app";
 const IDENTITY_REGISTRY = "0x8004A818BFB912233c491871b3d84c89A494BD9e"; // canonical ERC-8004 Identity on Arc
-const lat = (ms: number | null) => (ms == null ? "—" : ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`);
 
 export default async function ProvidersPage() {
   const [providers, totals] = await Promise.all([getProviders(), getTotals()]);
   return (
     <AppShell settled={totals.matchesSettled}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Eyebrow>Earn in the agora</Eyebrow>
-            <span style={{ fontSize: 20, fontWeight: 600 }}>Provider leaderboard</span>
-          </div>
-        </div>
+      <div className="page-head">
+        <p className="kicker">The Registry</p>
+        <h1>Stake your endpoint.</h1>
+        <p className="lede">Your x402 endpoint, underwritten. Register once — the broker sends paying demand to providers it can price.</p>
+        <hr className="ledger-rule" />
+      </div>
 
+      <div className="r-split" style={{ alignItems: "start" }}>
         <ProviderOnboarding />
 
-        <Card padding={0}>
-          {providers.length === 0 ? (
-            <EmptyState title="No providers yet." description="Register an x402 endpoint above — we probe it, pay one real call, and seed a reputation prior." />
-          ) : (
-            <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr>
-                  <th style={th}>#</th><th style={th}>Provider</th><th style={th}>Identity</th><th style={th}>ĉ</th><th style={th}>Trials</th>
-                  <th style={th}>Pass</th><th style={th}>Earned</th><th style={th}>Latency</th><th style={th}>Slashes</th><th style={th}>Wallet</th>
-                </tr></thead>
-                <tbody>
-                  {providers.map((p, i) => (
-                    <tr key={p.id} className="row-hover animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
-                      <td style={{ ...td, ...mono, color: "var(--muted-foreground)" }}>{i + 1}</td>
-                      <td style={{ ...td, fontWeight: 500 }}>{p.name}{p.inHouse && <span style={{ ...mono, fontSize: 10, color: "var(--muted-foreground)", marginLeft: 6 }}>·in-house</span>}</td>
-                      <td style={td}>{p.agentId ? (
-                        <a href={`${ARCSCAN}/token/${IDENTITY_REGISTRY}/instance/${p.agentId}`} target="_blank" rel="noreferrer" title="Verified ERC-8004 identity on Arc"
-                          style={{ ...mono, fontSize: 11, color: "var(--gold-lifted)", textDecoration: "none", border: "1px solid color-mix(in oklab, var(--gold) 40%, transparent)", borderRadius: "var(--radius)", padding: "2px 7px", whiteSpace: "nowrap" }}>
-                          8004 #{p.agentId}
-                        </a>
-                      ) : <span style={{ color: "var(--muted-foreground)" }}>—</span>}</td>
-                      <td style={{ ...td, ...mono }}>{p.confidence.toFixed(2)}</td>
-                      <td style={{ ...td, ...mono }}>{p.trials}</td>
-                      <td style={{ ...td, ...mono }}>{p.passRate}</td>
-                      <td style={{ ...td, ...mono }}>{p.earned.toFixed(4)}</td>
-                      <td style={{ ...td, ...mono, color: "var(--muted-foreground)" }}>{lat(p.avgLatencyMs)}</td>
-                      <td style={{ ...td, ...mono, color: p.slashes > 3 ? "var(--oxblood-badge)" : "var(--muted-foreground)" }}>{p.slashes}</td>
-                      <td style={td}><AddressChip address={p.wallet} href={`${ARCSCAN}/address/${p.wallet}`} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+        <div className="table-wrap">
+          <table>
+            <caption>Calibration leaderboard <span className="tag">ranked by ĉ</span></caption>
+            <thead>
+              <tr>
+                <th scope="col">#</th><th scope="col">Provider</th>
+                <th scope="col" className="t-right">ĉ</th><th scope="col" className="t-right">Trials</th>
+                <th scope="col" className="t-right">Pass</th><th scope="col" className="t-right">Earned</th>
+                <th scope="col" className="t-right">Slashes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {providers.length === 0 ? (
+                <tr><td colSpan={7} className="muted">No providers yet — register an x402 endpoint to seed the leaderboard.</td></tr>
+              ) : providers.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="num muted">{i + 1}</td>
+                  <td>
+                    {p.name}
+                    {p.inHouse && <span className="num" style={{ fontSize: 10, color: "var(--muted)", marginLeft: 6 }}>·in-house</span>}
+                    {p.agentId && (
+                      <a href={`${ARCSCAN}/token/${IDENTITY_REGISTRY}/instance/${p.agentId}`} target="_blank" rel="noreferrer" title="Verified ERC-8004 identity on Arc"
+                        className="num" style={{ fontSize: 10, color: "var(--accent-ink)", textDecoration: "none", border: "1px solid var(--line-strong)", borderRadius: "var(--radius-sm)", padding: "1px 6px", marginLeft: 6, whiteSpace: "nowrap" }}>
+                        8004 #{p.agentId}
+                      </a>
+                    )}
+                  </td>
+                  <td className="num t-right">{p.confidence.toFixed(2)}</td>
+                  <td className="num t-right">{p.trials}</td>
+                  <td className="num t-right">{p.passRate}</td>
+                  <td className="num t-right">{p.earned.toFixed(3)}</td>
+                  <td className="num t-right">{p.slashes > 0 ? <span style={{ color: "var(--slash)" }}>{p.slashes}</span> : <span className="muted">—</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="tfoot-note">ĉ is calibrated confidence — stated confidence corrected by observed pass rate. It sets the bond.</div>
+        </div>
       </div>
     </AppShell>
   );

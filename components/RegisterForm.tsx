@@ -1,6 +1,7 @@
 "use client";
+// Provider registration — handoff .card + .field form. Probes the endpoint (expects a well-formed
+// 402), pays one real call, and the validator scores a starting reputation via /api/registry.
 import { useState } from "react";
-import { Card, Button, Input, Eyebrow } from "./ui/primitives";
 
 export function RegisterForm() {
   const [form, setForm] = useState({ name: "", endpoint_url: "", price_usdc: "", wallet_address: "", capabilities: "", agent_id: "" });
@@ -8,7 +9,8 @@ export function RegisterForm() {
   const [message, setMessage] = useState("");
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
-  async function submit() {
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
     setState("probing"); setMessage("");
     try {
       const res = await fetch("/api/registry", {
@@ -23,32 +25,53 @@ export function RegisterForm() {
       const body = await res.json();
       if (res.ok) { setState("ok"); setMessage(`Probe paid and validated (score ${body.probe_score}) — you're live in the registry.`); }
       else { setState("fail"); setMessage(body.detail ?? body.error ?? "Registration failed."); }
-    } catch (e) {
-      setState("fail"); setMessage(e instanceof Error ? e.message : "Network error.");
+    } catch (err) {
+      setState("fail"); setMessage(err instanceof Error ? err.message : "Network error.");
     }
   }
 
   return (
-    <Card stele padding={20}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-        <Eyebrow>Register a provider</Eyebrow>
-        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-foreground)", maxWidth: 620, lineHeight: 1.5 }}>
-          Any x402 endpoint earns here. ENGYE probes it (expects a well-formed 402), pays one real call, and the validator scores you into a starting reputation — then the broker routes you paid demand.
-        </p>
-      </div>
-      <div className="r-2col" style={{ marginBottom: 16 }}>
-        <Input label="Name" placeholder="hermes-relay" value={form.name} onChange={set("name")} />
-        <Input label="Endpoint URL" mono placeholder="https://api.example.com/task" hint="Must answer 402 with payment requirements." value={form.endpoint_url} onChange={set("endpoint_url")} />
-        <Input label="Price per task" mono placeholder="0.05" hint="USDC" value={form.price_usdc} onChange={set("price_usdc")} />
-        <Input label="Wallet" mono placeholder="0x…" value={form.wallet_address} onChange={set("wallet_address")}
-          error={state === "fail" ? message : undefined} />
-        <Input label="Capabilities" placeholder="summarization, question-answering" hint="Comma-separated." value={form.capabilities} onChange={set("capabilities")} />
-        <Input label="ERC-8004 Agent ID" mono placeholder="845020" hint="Optional — verified on-chain: wallet must be the agent's wallet/owner." value={form.agent_id} onChange={set("agent_id")} />
-      </div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-        <Button size="sm" onClick={submit} disabled={state === "probing"}>{state === "probing" ? "Probing…" : "Probe & Register"}</Button>
-        {state === "ok" && <span style={{ fontSize: 13, color: "var(--success)" }}>{message}</span>}
-      </div>
-    </Card>
+    <div className="card">
+      <h3>Register a provider</h3>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label htmlFor="p-name">Name</label>
+          <input type="text" id="p-name" placeholder="hermes-relay" value={form.name} onChange={set("name")} required />
+        </div>
+        <div className="field">
+          <label htmlFor="p-endpoint">Endpoint URL</label>
+          <input type="url" id="p-endpoint" className="input-mono" placeholder="https://api.you.dev/task" value={form.endpoint_url} onChange={set("endpoint_url")} required />
+          <p className="hint">Must answer <span className="mono">402 Payment Required</span> before doing work — we probe it.</p>
+        </div>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="p-price">Price</label>
+            <div className="input-suffix">
+              <input type="number" id="p-price" step="0.001" min="0.001" placeholder="0.010" value={form.price_usdc} onChange={set("price_usdc")} required />
+              <span className="suffix">USDC</span>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="p-wallet">Wallet</label>
+            <input type="text" id="p-wallet" className="input-mono" placeholder="0x8f3C…" value={form.wallet_address} onChange={set("wallet_address")} required />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="p-caps">Capabilities</label>
+          <input type="text" id="p-caps" placeholder="summarize, extract, translate" value={form.capabilities} onChange={set("capabilities")} />
+        </div>
+        <div className="field">
+          <label htmlFor="p-agent">ERC-8004 Agent ID</label>
+          <input type="text" id="p-agent" className="input-mono" placeholder="845020 (optional)" value={form.agent_id} onChange={set("agent_id")} />
+          <p className="hint">Optional — verified on-chain: the wallet must be the agent&apos;s owner.</p>
+        </div>
+        <button className="btn btn-primary" type="submit" disabled={state === "probing"} aria-disabled={state === "probing"}>
+          {state === "probing" ? "Probing…" : "Probe & register"}
+        </button>
+        {state === "ok" && <p className="hint" style={{ color: "var(--pass)" }}>{message}</p>}
+        {state === "fail" && <p className="hint" style={{ color: "var(--slash)" }}>{message}</p>}
+        {state === "idle" && <p className="hint">The probe pays your price once and validates the exchange. Pass, and paying demand starts.</p>}
+      </form>
+    </div>
   );
 }

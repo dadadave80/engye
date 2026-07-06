@@ -7,7 +7,7 @@ import { useDisconnect } from "wagmi";
 import { encodeFunctionData, decodeAbiParameters, type Address } from "viem";
 import { ExternalLink, Copy, Check, ChevronDown, ChevronRight, X } from "lucide-react";
 import { Card, Button, Eyebrow } from "./ui/primitives";
-import { ConnectButton } from "./wallet/ConnectButton";
+import { ConnectGate } from "./ConnectGate";
 import { AddRecoveryModal } from "./wallet/AddRecoveryModal";
 import { useWallet } from "./wallet/useWallet";
 import { usePasskey } from "./wallet/passkey";
@@ -114,13 +114,9 @@ export function AccountPanel() {
 
   if (!wallet.connected || !address) {
     return (
-      <Card padding={24}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-          <Eyebrow>Your account</Eyebrow>
-          <p style={{ fontSize: 15, maxWidth: 520, lineHeight: 1.5, margin: 0 }}>Connect a passkey or browser wallet to view your account — balances, authorized signers, and recovery.</p>
-          <ConnectButton />
-        </div>
-      </Card>
+      <ConnectGate title="Connect to view your ledger">
+        Your balances and signers live on Arc; this page is just a window onto them.
+      </ConnectGate>
     );
   }
 
@@ -135,7 +131,7 @@ export function AccountPanel() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <a href={FAUCET} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm">Add Funds</Button></a>
           <a href="https://docs.arc.network" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><Button size="sm" variant="outline">Help</Button></a>
-          <Button size="sm" variant="outline" onClick={signOff} style={{ color: "var(--destructive)", borderColor: "var(--destructive)" }}>Sign Out</Button>
+          <Button size="sm" variant="outline" onClick={signOff}>Sign Out</Button>
         </div>
 
         {/* Your account + QR */}

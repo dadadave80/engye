@@ -1,19 +1,48 @@
 "use client";
 // The hero flow: a human requester connects, gets a live bonded quote, and PAYS FROM THEIR
 // OWN WALLET (x402/Gateway). On failure the bond + refund land in their wallet on-chain.
+// Disconnected → the handoff .gate + a dimmed preview; connected → the real .card form.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount, useWalletClient } from "wagmi";
-import { Card, Button, Input, Eyebrow, Badge, AddressChip } from "./ui/primitives";
-import { ConnectButton } from "./wallet/ConnectButton";
+import { ConnectGate } from "./ConnectGate";
 import { payX402, ensureGatewayFloat } from "@/lib/gatewayBrowser";
 import { ARCSCAN } from "@/lib/clientChain";
 
 type Quote =
   | { declined: true; reason: string }
-  | { declined: false; quote_id: string; action: string; provider_id: string; confidence: number; bond_usdc: number; total_price_usdc: number; reasoning_summary: string };
+  | { declined: false; quote_id: string; action: string; provider_id: string; provider_name?: string; confidence: number; bond_usdc: number; total_price_usdc: number; reasoning_summary: string };
 
-const mono: React.CSSProperties = { fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums" };
+const fx = (n: number) => n.toFixed(3);
+
+function PostPreview() {
+  return (
+    <div className="preview">
+      <p className="preview-label">Preview — after you connect</p>
+      <div className="card">
+        <div className="field">
+          <label htmlFor="pv-type">Task type</label>
+          <select id="pv-type" disabled><option>Summarize a link</option><option>Extract JSON</option><option>Draft an email</option><option>Review code</option></select>
+        </div>
+        <div className="field">
+          <label htmlFor="pv-spec">Spec</label>
+          <textarea id="pv-spec" rows={3} disabled placeholder="What does good look like? The validator scores against exactly this." />
+        </div>
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="pv-price">Max price</label>
+            <div className="input-suffix"><input type="number" id="pv-price" disabled placeholder="0.010" /><span className="suffix">USDC</span></div>
+          </div>
+          <div className="field">
+            <label htmlFor="pv-window">Verdict window</label>
+            <select id="pv-window" disabled><option>2 minutes</option><option>10 minutes</option><option>1 hour</option></select>
+          </div>
+        </div>
+        <button className="btn btn-primary" type="button" disabled aria-disabled>Post to the floor</button>
+      </div>
+    </div>
+  );
+}
 
 export function PostTaskForm() {
   const router = useRouter();
@@ -50,9 +79,6 @@ export function PostTaskForm() {
       const body = await res.json();
       if (!res.ok) throw new Error(body.message ?? body.error ?? "execution failed");
       setResult(body);
-      // Both bonded (status: "delivered_awaiting_verdict") and unbonded (status: "delivered")
-      // responses carry a match_key — send the requester straight to the match page, which
-      // renders the live verdict (or the settled unbonded record) itself.
       if (body.match_key) router.push(`/m/${body.match_key}`);
     } catch (e) { setErr(e instanceof Error ? e.message.split("\n")[0] : String(e)); }
     finally { setBusy(null); }
@@ -60,85 +86,68 @@ export function PostTaskForm() {
 
   if (!isConnected) {
     return (
-      <Card padding={24}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "flex-start" }}>
-          <Eyebrow>Enter the agora</Eyebrow>
-          <p style={{ fontSize: 15, maxWidth: 560, lineHeight: 1.5, margin: 0 }}>Post a task and ENGYE bonds USDC behind the match it makes — sized by its own confidence. Pay from your wallet; if the work fails validation, the bond and a refund land back in your wallet automatically. Connect to begin.</p>
-          <ConnectButton />
-        </div>
-      </Card>
+      <>
+        <ConnectGate title="Connect to post">A posted task is escrowed up front; the broker only quotes what it can honestly price.</ConnectGate>
+        <PostPreview />
+      </>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Card padding={24}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="r-2col">
-            <Input label="Task type" placeholder="question-answering" value={type} onChange={(e) => setType(e.target.value)} />
-            <Input label="Max price (USDC)" mono placeholder="0.01" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} />
+    <>
+      <div className="card">
+        <div className="form-grid">
+          <div className="field">
+            <label htmlFor="t-type">Task type</label>
+            <input type="text" id="t-type" placeholder="question-answering" value={type} onChange={(e) => setType(e.target.value)} />
           </div>
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>Task spec</span>
-            <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={3} className="focus-ring"
-              placeholder="What is the capital of Australia, and why is it not Sydney?"
-              style={{ fontFamily: "var(--font-body)", fontSize: 14, padding: "10px 12px", background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--input)", borderRadius: "var(--radius)", outline: "none", resize: "vertical" }} />
-          </label>
-          <div><Button disabled={busy !== null || !spec} onClick={getQuote}>{busy === "quote" ? "Getting Quote…" : "Get Bonded Quote"}</Button></div>
+          <div className="field">
+            <label htmlFor="t-price">Max price</label>
+            <div className="input-suffix"><input type="number" id="t-price" className="input-mono" placeholder="0.010" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} /><span className="suffix">USDC</span></div>
+          </div>
         </div>
-      </Card>
+        <div className="field">
+          <label htmlFor="t-spec">Spec</label>
+          <textarea id="t-spec" rows={3} placeholder="What does good look like? The validator scores against exactly this." value={spec} onChange={(e) => setSpec(e.target.value)} />
+        </div>
+        <button className="btn btn-primary" disabled={busy !== null || !spec} aria-disabled={busy !== null || !spec} onClick={getQuote}>
+          {busy === "quote" ? "Getting quote…" : "Get bonded quote"}
+        </button>
+      </div>
 
       {quote && quote.declined && (
-        <Card padding={20}><span style={{ color: "var(--muted-foreground)" }}>Broker declined: {quote.reason}</span></Card>
+        <div className="card" style={{ marginTop: "var(--space-4)" }}><span className="muted">Broker declined: {quote.reason}</span></div>
       )}
 
       {quote && !quote.declined && !result && (
-        <Card stele padding={24}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Eyebrow>The bonded quote</Eyebrow>
-            <div className="r-stat-grid">
-              <Stat label="Confidence" value={quote.confidence.toFixed(2)} />
-              <Stat label="Bond staked" value={`${quote.bond_usdc.toFixed(3)} USDC`} tone="gold" />
-              <Stat label="You pay" value={`${quote.total_price_usdc.toFixed(4)} USDC`} />
-            </div>
-            <p style={{ fontSize: 13, color: "var(--muted-foreground)", lineHeight: 1.5, margin: 0 }}>{quote.reasoning_summary}</p>
-            <div><Button disabled={busy !== null} onClick={payAndExecute}>{busy === "pay" ? "Signing & Paying…" : `Pay ${quote.total_price_usdc.toFixed(4)} USDC & Execute`}</Button></div>
+        <div className="quote-card" style={{ marginTop: "var(--space-4)" }}>
+          <div className="quote-head">Bonded Quote</div>
+          <div className="quote-grid">
+            {quote.provider_name && <div><div className="q-label">provider</div><div className="q-value">{quote.provider_name}</div></div>}
+            <div><div className="q-label">confidence ĉ</div><div className="q-value">{quote.confidence.toFixed(2)}</div></div>
+            <div><div className="q-label">you pay</div><div className="q-value">{fx(quote.total_price_usdc)} USDC</div></div>
+            <div><div className="q-label">bond</div><div className="q-value accent">{fx(quote.bond_usdc)} USDC</div></div>
           </div>
-        </Card>
+          <p className="small muted" style={{ margin: "0 0 0.5rem" }}>{quote.reasoning_summary}</p>
+          <div className="quote-actions">
+            <button className="btn btn-primary" disabled={busy !== null} aria-disabled={busy !== null} onClick={payAndExecute}>
+              {busy === "pay" ? "Signing & paying…" : `Pay ${fx(quote.total_price_usdc)} USDC & execute`}
+            </button>
+          </div>
+        </div>
       )}
 
       {result && (
-        <Card stele padding={24}>
-          {/* Delivery no longer implies a verdict — a bonded match returns "delivered_awaiting_verdict"
-              with no validation/slash_tx/settle_tx/refund_tx yet (those land async). This is just the
-              pre-redirect flash; router.push above sends the requester to /m/[matchKey] to watch the
-              live verdict (bonded) or see the settled record (unbonded) there instead. */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <Badge status="OPEN" label="delivered" />
-              <span style={{ fontSize: 15, fontWeight: 600 }}>
-                {result.status === "delivered_awaiting_verdict"
-                  ? "Delivered — opening your match page to watch the verdict…"
-                  : "Delivered — opening your match page…"}
-              </span>
-            </div>
-            {result.bond_tx ? (
-              <a href={`${ARCSCAN}/tx/${result.bond_tx}`} target="_blank" rel="noreferrer" style={{ color: "var(--link)", ...mono, fontSize: 13 }}>bond: {(result.bond_tx as string).slice(0, 10)}…</a>
-            ) : null}
-          </div>
-        </Card>
+        <div className="quote-card" style={{ marginTop: "var(--space-4)" }}>
+          <div className="quote-head">Delivered</div>
+          <p style={{ margin: "10px 0 0", fontSize: "var(--text-sm)" }}>
+            {result.status === "delivered_awaiting_verdict" ? "Opening your match page to watch the verdict…" : "Opening your match page…"}
+          </p>
+          {result.bond_tx ? <a className="tx-link" href={`${ARCSCAN}/tx/${result.bond_tx}`} target="_blank" rel="noreferrer">bond {(result.bond_tx as string).slice(0, 10)}… ↗</a> : null}
+        </div>
       )}
 
-      {err && <Card padding={16}><span style={{ color: "var(--oxblood-badge)", fontSize: 13 }}>{err}</span></Card>}
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted-foreground)", marginBottom: 6 }}>{label}</div>
-      <div style={{ ...mono, fontSize: 22, color: tone === "gold" ? "var(--gold-lifted)" : "var(--foreground)" }}>{value}</div>
-    </div>
+      {err && <div className="card" style={{ marginTop: "var(--space-4)" }}><span className="small" style={{ color: "var(--slash)" }}>{err}</span></div>}
+    </>
   );
 }

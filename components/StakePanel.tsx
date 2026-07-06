@@ -1,17 +1,17 @@
 "use client";
 // Provider co-insurance staking — user-signed rail-B, EOA OR passkey (via useAccountActions).
 // Approve + stake batches into one passkey intent, or two EOA txs. Reads live stake from chain.
+// Disconnected → the handoff .gate; connected → .card with live stake + .field amount + .btn actions.
 import { useEffect, useState } from "react";
 import { encodeFunctionData } from "viem";
-import { Card, Button, Input, Eyebrow } from "./ui/primitives";
-import { ConnectButton } from "./wallet/ConnectButton";
+import { ConnectGate } from "./ConnectGate";
 import { useAccountActions } from "./wallet/useAccountActions";
 import {
   publicClient, PROVIDER_STAKE, USDC, erc20Abi, providerStakeAbi, usdcAtomicOrNull, fromAtomic, ARCSCAN,
 } from "@/lib/clientChain";
 import type { Call } from "@/lib/ithaca";
 
-const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 14, padding: "6px 0" };
+const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: "var(--text-sm)", padding: "6px 0", borderTop: "1px solid var(--line)" };
 
 export function StakePanel() {
   const { send, wallet } = useAccountActions();
@@ -32,13 +32,13 @@ export function StakePanel() {
       publicClient.readContract({ address: USDC, abi: erc20Abi, functionName: "balanceOf", args: [address] }),
     ]);
     const [amt, unlock] = p as [bigint, bigint];
-    const left = Number(unlock) - Math.floor(Date.now() / 1000); // time read in the async refresh, not render
+    const left = Number(unlock) - Math.floor(Date.now() / 1000);
     setStaked(s as bigint);
     setPending({ amount: amt, unlock });
     setCooldown({ left, canWithdraw: amt > 0n && left <= 0 });
     setUsdcBal(b as bigint);
   }
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setState runs after await, not synchronously
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch-on-mount; setState runs after await
   useEffect(() => { void refresh(); }, [address]);
 
   async function run(label: string, calls: Call[]) {
@@ -59,7 +59,6 @@ export function StakePanel() {
   async function stake() {
     const atomic = usdcAtomicOrNull(Number(amount));
     if (atomic === null) { setMsg({ text: "Enter a valid amount", err: true }); return; }
-    // approve + stake — one batched passkey intent, or two sequential EOA txs
     await run("Stake", [
       call(USDC, erc20Abi, "approve", [PROVIDER_STAKE, atomic]),
       call(PROVIDER_STAKE, providerStakeAbi, "stake", [atomic]),
@@ -75,51 +74,53 @@ export function StakePanel() {
 
   if (!wallet.connected) {
     return (
-      <Card padding={24}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-          <Eyebrow>Skin in the game</Eyebrow>
-          <p style={{ fontSize: 15, maxWidth: 520, lineHeight: 1.5, margin: 0 }}>Stake USDC as co-insurance behind your endpoint. On a failed match, your stake is slashed to the requester on top of ENGYE&apos;s bond — so staking is a public signal of confidence, and the broker weighs it when routing.</p>
-          <ConnectButton />
-        </div>
-      </Card>
+      <ConnectGate title="Connect to stake">
+        Stakers underwrite the bond pool alongside ENGYE. Slashes draw from the pool; settles feed it.
+      </ConnectGate>
     );
   }
 
   const { left: cooldownLeft, canWithdraw } = cooldown;
 
   return (
-    <Card padding={24}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {wallet.kind === "passkey" && <div style={{ fontSize: 12, color: "var(--muted-foreground)" }}>Passkey account · ENGYE relays gas · signed with your device</div>}
-        <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Your stake</span><span>{fromAtomic(staked).toFixed(4)} USDC</span></div>
-        <div style={row}><span style={{ color: "var(--muted-foreground)" }}>Account USDC</span><span>{fromAtomic(usdcBal).toFixed(4)} USDC</span></div>
-        {usdcBal < 1_000000n && (
-          <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--muted-foreground)", textDecoration: "none" }}>
-            Need more USDC? Claim testnet USDC at the <span style={{ color: "var(--link)" }}>Circle Faucet ↗</span> — pick Arc Testnet, paste your address.
-          </a>
-        )}
+    <div className="card">
+      {wallet.kind === "passkey" && <p className="small muted" style={{ marginTop: 0 }}>Passkey account · ENGYE relays gas · signed with your device</p>}
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <div style={row}><span className="muted">Your stake</span><span>{fromAtomic(staked).toFixed(3)} USDC</span></div>
+        <div style={row}><span className="muted">Account USDC</span><span>{fromAtomic(usdcBal).toFixed(3)} USDC</span></div>
         {pending.amount > 0n && (
-          <div style={{ ...row, color: "var(--gold-lifted)" }}><span>Unstaking</span><span>{fromAtomic(pending.amount).toFixed(4)} · {canWithdraw ? "ready" : `${Math.ceil(cooldownLeft / 60)}m cooldown`}</span></div>
-        )}
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div className="min-w-0" style={{ flex: 1, minWidth: 160 }}><Input label="Amount (USDC)" mono placeholder="1.0" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-          <Button disabled={busy !== null || !amount} onClick={stake}>{busy === "Stake" ? "Staking…" : "Stake"}</Button>
-        </div>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Button variant="outline" size="sm" disabled={busy !== null || staked === 0n || !amount} onClick={requestUnstake}>
-            Request Unstake
-          </Button>
-          <Button variant="outline" size="sm" disabled={busy !== null || !canWithdraw}
-            onClick={() => run("Withdraw", [call(PROVIDER_STAKE, providerStakeAbi, "withdraw", [])])}>
-            Withdraw
-          </Button>
-        </div>
-        {msg && (
-          <div style={{ fontSize: 13, color: msg.err ? "var(--oxblood-badge)" : "var(--success)" }}>
-            {msg.text}{msg.tx && <> · <a href={`${ARCSCAN}/tx/${msg.tx}`} target="_blank" rel="noreferrer" style={{ color: "var(--link)" }}>Arcscan</a></>}
-          </div>
+          <div style={{ ...row, color: "var(--accent-ink)" }}><span>Unstaking</span><span>{fromAtomic(pending.amount).toFixed(3)} · {canWithdraw ? "ready" : `${Math.ceil(cooldownLeft / 60)}m cooldown`}</span></div>
         )}
       </div>
-    </Card>
+      {usdcBal < 1_000000n && (
+        <p className="small muted">
+          Need more USDC? Claim testnet USDC at the <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer">Circle Faucet ↗</a> — pick Arc Testnet, paste your address.
+        </p>
+      )}
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="s-amount">Your stake</label>
+          <div className="input-suffix">
+            <input type="number" id="s-amount" className="input-mono" placeholder="0.050" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <span className="suffix">USDC</span>
+          </div>
+          <p className="hint">Withdraw any time no bonds are open against the pool.</p>
+        </div>
+        <div className="field" style={{ alignSelf: "end" }}>
+          <button className="btn btn-primary" style={{ width: "100%" }} disabled={busy !== null || !amount} aria-disabled={busy !== null || !amount} onClick={stake}>
+            {busy === "Stake" ? "Staking…" : "Stake"}
+          </button>
+        </div>
+      </div>
+      <div className="quote-actions">
+        <button className="btn btn-ghost btn-sm" disabled={busy !== null || staked === 0n || !amount} aria-disabled={busy !== null || staked === 0n || !amount} onClick={requestUnstake}>Request unstake</button>
+        <button className="btn btn-ghost btn-sm" disabled={busy !== null || !canWithdraw} aria-disabled={busy !== null || !canWithdraw} onClick={() => run("Withdraw", [call(PROVIDER_STAKE, providerStakeAbi, "withdraw", [])])}>Withdraw</button>
+      </div>
+      {msg && (
+        <p className="small" style={{ marginTop: "var(--space-3)", color: msg.err ? "var(--slash)" : "var(--pass)" }}>
+          {msg.text}{msg.tx && <> · <a href={`${ARCSCAN}/tx/${msg.tx}`} target="_blank" rel="noreferrer">Arcscan ↗</a></>}
+        </p>
+      )}
+    </div>
   );
 }

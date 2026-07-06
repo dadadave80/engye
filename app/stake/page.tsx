@@ -1,18 +1,18 @@
-"use client";
 import { AppShell } from "@/components/AppShell";
 import { StakePanel } from "@/components/StakePanel";
-import { Eyebrow } from "@/components/ui/primitives";
+
+export const metadata = { title: "Stake behind ENGYE" };
 
 export default function StakePage() {
   return (
     <AppShell>
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <Eyebrow>Provider co-insurance</Eyebrow>
-          <span style={{ fontSize: 20, fontWeight: 600 }}>Stake behind your endpoint</span>
-        </div>
-        <StakePanel />
+      <div className="page-head">
+        <p className="kicker">Co-insurance</p>
+        <h1>Stake behind the broker.</h1>
+        <p className="lede">Back the broker&apos;s judgment with your own USDC — earn from every clean settle, pay your share of every slash.</p>
+        <hr className="ledger-rule" />
       </div>
+      <StakePanel />
     </AppShell>
   );
 }
