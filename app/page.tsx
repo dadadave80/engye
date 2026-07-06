@@ -42,7 +42,11 @@ export default async function Landing() {
   }
   const h0 = heroBonds[0];
 
-  const floorStrip = `floor now · ${T.openCount} bond${T.openCount === 1 ? "" : "s"} open · ${fx(T.bondsAtRisk)} USDC at stake · ${T.matchesSettled} settled · ${T.slashedCount} slashed`;
+  // never show "0.000 USDC at stake" (brand: money is never 0.00) — when nothing is currently
+  // bonded, lead with the cumulative ledger instead of a live at-stake figure.
+  const floorStrip = T.bondsAtRisk > 0
+    ? `floor now · ${T.openCount} bond${T.openCount === 1 ? "" : "s"} open · ${fx(T.bondsAtRisk)} USDC at stake · ${T.matchesSettled} settled · ${T.slashedCount} slashed`
+    : `floor now · ${T.matchesSettled} settled · ${fx(T.usdcSettled)} USDC moved · ${T.slashedCount} slashed`;
   const boardStrip = `${T.matchesSettled} matches settled · ${T.slashedCount} slashed · ${fx(T.usdcSettled)} USDC moved`;
 
   const P = walk.pass ?? { task: "summarize: arxiv/2406.11238", provider: "hermes-relay", price: 0.010, conf: 0.87, bond: 0.030, score: 91, bondTx: null, verdictTx: null, settleTx: null };
