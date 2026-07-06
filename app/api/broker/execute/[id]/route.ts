@@ -86,12 +86,6 @@ export async function POST(
   const matchKey = keccak256(toBytes(`${id}:${Date.now()}`)) as Hex;
   const startedAt = Date.now();
 
-  // Bond-aware worker experiment (BOND_AWARE_WORKER=1): on a bonded, in-house match, randomize the
-  // worker into an "aware" arm (bond stakes prepended to its prompt, see lib/inhouse.ts) vs the
-  // baseline, and tag the match so pass rates can be A/B'd (scripts/bond-experiment.ts).
-  const bondExperiment = process.env.BOND_AWARE_WORKER === "1" && bonded && !!pkForWallet(provider.wallet_address);
-  const bondAware = bondExperiment && Math.random() < 0.5;
-
   const { data: decisionRow } = await supabaseAdmin
     .from("decisions").select("raw_json,derived,prompt_hash,model")
     .eq("quote_id", id).eq("kind", "broker_quote").single();
@@ -104,8 +98,7 @@ export async function POST(
     .from("matches")
     .insert({
       quote_id: id, provider_id: provider.id, match_key: matchKey, status: "pending",
-      decision_json: { ...JSON.parse(decisionJson), ...(bondExperiment ? { experiment: { bond_aware: bondAware } } : {}) },
-      bond_usdc: quote.bond_usdc,
+      decision_json: JSON.parse(decisionJson), bond_usdc: quote.bond_usdc,
       price_usdc: quote.total_price_usdc,
       source: req.nextUrl.searchParams.get("source") ?? req.headers.get("x-engye-source") ?? "organic",
     })
@@ -137,7 +130,7 @@ export async function POST(
       provider.endpoint_url,
       Number(provider.price_usdc),
       process.env.BROKER_PRIVATE_KEY!,
-      { method: "POST", body: JSON.stringify(bondAware ? { ...quote.task, __bond: { usdc: Number(quote.bond_usdc), aware: true } } : quote.task) },
+      { method: "POST", body: JSON.stringify(quote.task) },
     );
     const deliverable = result.data;
     txs.pay_tx = String(result.transaction ?? "");
