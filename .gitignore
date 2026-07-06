@@ -47,6 +47,7 @@ next-env.d.ts
 
 # ENGYE working docs — README.md is the only tracked markdown
 CLAUDE.md
+CONTEXT.md
 BONDED_BROKER_PLAN.md
 DESIGN_HANDOVER.md
 JUDGES.md
