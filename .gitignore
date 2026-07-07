@@ -45,8 +45,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# ENGYE working docs — README.md is the only tracked markdown
-CLAUDE.md
+# ENGYE working docs (local only; README + ARCHITECTURE + CLAUDE.md are the tracked markdown)
+docs/
+demo-script.md
 CONTEXT.md
 BONDED_BROKER_PLAN.md
 DESIGN_HANDOVER.md

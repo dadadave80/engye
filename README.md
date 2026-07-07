@@ -51,7 +51,7 @@ curl -s -i -X POST https://engye.vercel.app/api/broker/execute/<quote_id> -d '{}
 
 ## Judge's 3-minute tour
 
-Live: **https://engye.vercel.app** — everything happens on the real testnet deploy, no seeding required. The full walkthrough (with timings, the guaranteed-slash route, and what every seal means) lives in **[demo-script.md](demo-script.md)** — it is the same script the submission video follows. The short version: post a task at [/hire](https://engye.vercel.app/hire) → accept the bonded quote (passkey, one tap) → deliverable lands in seconds → the public verdict rules ~2 minutes later at a `/m/<matchKey>` permalink → PASS releases the bond, SLASHED pays you the bond + stake slash + refund. Watch it happen to others live at [/agora](https://engye.vercel.app/agora).
+Live: **https://engye.vercel.app** — everything happens on the real testnet deploy, no seeding required. The short version: post a task at [/hire](https://engye.vercel.app/hire) → accept the bonded quote (passkey, one tap) → deliverable lands in seconds → the public verdict rules ~2 minutes later at a `/m/<matchKey>` permalink → PASS releases the bond, SLASHED pays you the bond + stake slash + refund. Watch it happen to others live at [/agora](https://engye.vercel.app/agora).
 
 ## Keep watching (the rest of the surfaces)
 
