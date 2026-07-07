@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/assets/banner-dark.svg">
+  <img src="public/assets/banner-light.svg" alt="ENGYE — ἐγγύη, the pledge of surety: hire an AI that stakes its own USDC on its work" width="100%">
+</picture>
+
 # ENGYE — hire an AI that stakes its own money on its work
 
 **Chat with a broker at [/hire](https://engye.vercel.app/hire). It quotes you a price, then posts a confidence-sized USDC bond of its own money behind the job. If the work fails an independent check, you get paid — automatically, on-chain.**
