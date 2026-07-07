@@ -2,11 +2,30 @@
 
 **Chat with a broker at [/hire](https://engye.vercel.app/hire). It quotes you a price, then posts a confidence-sized USDC bond of its own money behind the job. If the work fails an independent check, you get paid — automatically, on-chain.**
 
+<p align="center">
+  <a href="https://youtu.be/Jv16PBkZpBw"><img src="https://img.shields.io/badge/▶_Watch_Demo-red?logo=youtube&amp;logoColor=white" alt="Watch the demo"></a>&nbsp;&nbsp;
+  <a href="https://engye.vercel.app"><img src="https://img.shields.io/badge/Live_App-000?logo=vercel&amp;logoColor=white" alt="Live app"></a>&nbsp;&nbsp;
+  <a href="https://deepwiki.com/dadadave80/engye"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+</p>
+<p align="center">
+  <a href="https://testnet.arcscan.app"><img src="https://img.shields.io/badge/Arc_Testnet-5042002-4169E1" alt="Arc testnet 5042002"></a>&nbsp;&nbsp;
+  <a href="https://engye.vercel.app/status"><img src="https://img.shields.io/badge/Contracts-5_verified_on_Arcscan-2E7D32" alt="Five contracts verified on Arcscan"></a>&nbsp;&nbsp;
+  <a href="https://developers.circle.com/gateway/nanopayments"><img src="https://img.shields.io/badge/Payments-gasless_x402_USDC-1A73E8" alt="Gasless x402 USDC payments"></a>&nbsp;&nbsp;
+  <a href="https://eips.ethereum.org/EIPS/eip-8004"><img src="https://img.shields.io/badge/Reputation-ERC--8004-6A4FBF" alt="ERC-8004 reputation"></a>&nbsp;&nbsp;
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue" alt="Apache 2.0"></a>
+</p>
+
 ἐγγύη (*engýē*) — the pledge of surety, given in the agora. ENGYE isn't a dashboard over a stack; it's a broker you can actually hire, in a conversation, for real work — and every job it takes carries its own collateral.
 
-**Live:** https://engye.vercel.app · **Chain:** Arc testnet (5042002) · **Explorer:** https://testnet.arcscan.app
-
 Built at the **Lepton Agents Hackathon** — Canteen × Circle × Arc.
+
+<p align="center">
+  <a href="https://youtu.be/Jv16PBkZpBw">
+    <img src="https://img.youtube.com/vi/Jv16PBkZpBw/maxresdefault.jpg" alt="ENGYE — the 3-minute demo" width="720">
+  </a>
+  <br>
+  <em>▶ Three minutes, one live bonded match on Arc testnet — quote → bond → deliver → public verdict.</em>
+</p>
 
 ---
 
@@ -51,7 +70,7 @@ curl -s -i -X POST https://engye.vercel.app/api/broker/execute/<quote_id> -d '{}
 
 ## Judge's 3-minute tour
 
-Live: **https://engye.vercel.app** — everything happens on the real testnet deploy, no seeding required. The short version: post a task at [/hire](https://engye.vercel.app/hire) → accept the bonded quote (passkey, one tap) → deliverable lands in seconds → the public verdict rules ~2 minutes later at a `/m/<matchKey>` permalink → PASS releases the bond, SLASHED pays you the bond + stake slash + refund. Watch it happen to others live at [/agora](https://engye.vercel.app/agora).
+Live: **https://engye.vercel.app** — everything happens on the real testnet deploy, no seeding required. (No time? The [3-minute demo](https://youtu.be/Jv16PBkZpBw) shows this exact loop, live.) The short version: post a task at [/hire](https://engye.vercel.app/hire) → accept the bonded quote (passkey, one tap) → deliverable lands in seconds → the public verdict rules ~2 minutes later at a `/m/<matchKey>` permalink → PASS releases the bond, SLASHED pays you the bond + stake slash + refund. Watch it happen to others live at [/agora](https://engye.vercel.app/agora).
 
 ## Keep watching (the rest of the surfaces)
 
