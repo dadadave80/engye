@@ -128,17 +128,36 @@ export async function runCycle(): Promise<CycleOutcome> {
 /** CLI runner for the cron + local loop. One cycle by default, `cycles` N, or an infinite `loop`
  *  every 5 minutes. Lives here (not in a loose agents/ file) so the GitHub workflow + `demand:loop`
  *  invoke it directly: `bun -e "import('./lib/demand.ts').then(m => m.runCli())"`. */
-export async function runCli(opts: { loop?: boolean; cycles?: number } = {}): Promise<void> {
-  const onError = (e: unknown) => console.error("cycle error:", e instanceof Error ? e.message : e);
+/** A demand buy is best-effort: a payment/lifecycle transient on Arc testnet is EXPECTED (the match
+ *  self-heals via the settle sweep — no money lost), so it must NOT red the cron. Only a genuine
+ *  break — a missing signing key, or the app being unreachable — is worth failing the run. */
+function isFatalSetupError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /DEMAND_PRIVATE_KEY|fetch failed|ECONNREFUSED|ENOTFOUND|Unable to connect|getaddrinfo/i.test(msg);
+}
+
+export async function runCli(opts: { loop?: boolean; cycles?: number; retries?: number } = {}): Promise<void> {
+  const log = (label: string, e: unknown) => console.error(label, e instanceof Error ? e.message : e);
   if (opts.loop) {
     for (;;) {
-      await runCycle().catch(onError);
+      await runCycle().catch((e) => log("cycle error:", e)); // already best-effort; next slot retries
       await new Promise((r) => setTimeout(r, 5 * 60 * 1000));
     }
   }
   const cycles = opts.cycles ?? 1;
+  const retries = opts.retries ?? 2; // retry a transient a couple times: clears most, and lands a real buy
   for (let i = 0; i < cycles; i++) {
-    await runCycle().catch((e) => { onError(e); process.exitCode = 1; });
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await runCycle();
+        break; // any outcome (bought/declined/skipped/budget_exhausted) is a successful run
+      } catch (e) {
+        if (isFatalSetupError(e)) { log("cycle error (fatal — failing the run):", e); process.exitCode = 1; break; }
+        if (attempt < retries) { log(`cycle error (attempt ${attempt + 1}/${retries + 1}, retrying):`, e); await new Promise((r) => setTimeout(r, 4_000)); continue; }
+        log("cycle error (best-effort transient — not failing the run):", e); // the match self-heals; the cron ran
+        break;
+      }
+    }
   }
 }
 
